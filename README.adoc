@@ -7,6 +7,10 @@ This Go Tool can be used to initialize Vault. It can perform the following steps
 * Vault unseal 
 * Enable Kubernetes authentication
 
+## Disclaimer
+In this version, the Vault token and unseal Keys can only be saved to a Kubernetes secret. This is insecure and this deployment is *ONLY SUITED FOR DEVELOPMENT ENVIRONMENTS*.
+However, this tool can be extended to save Vault token and unseal Keys to a different secret engine (Azure Key Vault, AWS KMS, another Vault instance). 
+
 ## Usage
 
 Deploy it to OpenShift or Kubernetes using the following Job:
@@ -92,3 +96,5 @@ The configurations are specified as Environment variables. Below the supported o
 |true
 |Enable Kubernetes authentication for Vault
 |===
+
+
