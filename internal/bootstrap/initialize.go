@@ -32,7 +32,7 @@ func operatorInit(client *vault.Client) (*string, *[]string, error) {
 
 // log tokens to K8s log if you don't want to save it in a secret
 func logTokens(rootToken *string, unsealKeys *[]string) {
-	tokenLog := fmt.Sprintf("Root Token: %s", rootToken)
+	tokenLog := fmt.Sprintf("Root Token: %s", *rootToken)
 	unsealKeysLog := fmt.Sprintf("Unseal Key(s): %s", strings.Join(*unsealKeys, ";"))
 	log.Info(tokenLog)
 	log.Info(unsealKeysLog)

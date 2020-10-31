@@ -24,24 +24,25 @@ const (
 	DefaultVaultK8sSecret        = true
 	DefaultVaultUnseal           = true
 	DefaultVaultK8sAuth          = true
+	DefaultVaultServiceAccount   = "vault"
 
-	VaultSecret         = "vault"
-	VaultServiceAccount = "vault"
+	VaultSecret = "vault"
 )
 
 var (
-	vaultAddr           string
-	vaultClusterSize    int
-	vaultClusterMembers string
+	vaultAddr             string
+	vaultClusterSize      int
+	vaultClusterMembers   string
 	storageClusterMembers string
-	vaultKeyShares      int
-	vaultKeyThreshold   int
-	vaultInit           bool
-	vaultK8sSecret      bool
-	vaultUnseal         bool
-	vaultK8sAuth        bool
-	err                 error
-	ok                  bool
+	vaultKeyShares        int
+	vaultKeyThreshold     int
+	vaultInit             bool
+	vaultK8sSecret        bool
+	vaultUnseal           bool
+	vaultK8sAuth          bool
+	vaultServiceAccount   string
+	err                   error
+	ok                    bool
 )
 
 func init() {
@@ -89,7 +90,7 @@ func init() {
 		}
 	}
 	if extrVaultK8sSecret, ok := os.LookupEnv("VAULT_ENABLE_K8SSECRET"); !ok {
-		log.Warn("VAULT_ENABLE_K8SSSECRET not set. Defaulting to ", DefaultVaultK8sSecret)
+		log.Warn("VAULT_ENABLE_K8SSECRET not set. Defaulting to ", DefaultVaultK8sSecret)
 		vaultK8sSecret = DefaultVaultK8sSecret
 	} else {
 		vaultK8sSecret, err = strconv.ParseBool(extrVaultK8sSecret)
@@ -114,6 +115,11 @@ func init() {
 		if err != nil {
 			log.Error("Invalid value for VAULT_ENABLE_K8SAUTH" + err.Error())
 		}
+	}
+	if vaultServiceAccount, ok := os.LookupEnv("VAULT_SERVICE_ACCOUNT"); !ok {
+		log.Warn("VAULT_SERVICE_ACCOUNT not set. Defaulting to ", DefaultVaultServiceAccount)
+		vaultServiceAccount = DefaultVaultServiceAccount
+		os.Setenv("VAULT_SERVICE_ACCOUNT", vaultServiceAccount)
 	}
 }
 
