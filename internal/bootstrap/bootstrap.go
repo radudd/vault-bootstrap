@@ -116,7 +116,7 @@ func init() {
 			log.Error("Invalid value for VAULT_ENABLE_K8SAUTH" + err.Error())
 		}
 	}
-	extrVaultServiceAccount, ok := os.LookupEnv("VAULT_SERVICE_ACCOUNT"); !ok {
+	if extrVaultServiceAccount, ok := os.LookupEnv("VAULT_SERVICE_ACCOUNT"); !ok {
 		log.Warn("VAULT_SERVICE_ACCOUNT not set. Defaulting to ", DefaultVaultServiceAccount)
 		vaultServiceAccount = DefaultVaultServiceAccount
 	} else {
