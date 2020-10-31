@@ -7,6 +7,10 @@ This Go Tool can be used to initialize Vault. It can perform the following steps
 * Vault unseal 
 * Enable Kubernetes authentication
 
+## Disclaimer
+In this version, the Vault token and unseal Keys can only be saved to a Kubernetes secret. This is insecure and this deployment is *ONLY SUITED FOR DEVELOPMENT ENVIRONMENTS*.
+However, this tool can be extended to save Vault token and unseal Keys to a different secret engine (Azure Key Vault, AWS KMS, another Vault instance). 
+
 ## Usage
 
 The container image is hosted at quay.io in the following repo: *quay.io/radudd/vault-bootstrap*
