@@ -153,7 +153,7 @@ func Run() {
 	}
 
 	preflight(clientsetK8s, namespace)
-	time.Sleep(3 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	var rootToken *string
 	var unsealKeys *[]string
@@ -232,6 +232,7 @@ func Run() {
 	}
 
 	if vaultK8sAuth {
+		time.Sleep(10 * time.Second)
 		// set root token
 		client.SetToken(*rootToken)
 		k8sAuth, err := checkK8sAuth(client)

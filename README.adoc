@@ -9,7 +9,9 @@ This Go Tool can be used to initialize Vault. It can perform the following steps
 
 ## Usage
 
-Deploy it to OpenShift or Kubernetes using the following Job:
+The container image is hosted at quay.io in the following repo: *quay.io/radudd/vault-bootstrap*
+
+To install Vault Bootstrap to OpenShift or Kubernetes, deploy the following Job:
 
 ```
 cat <<EOF | oc apply -f 
@@ -35,6 +37,9 @@ spec:
             - name: VAULT_CLUSTER_MEMBERS
               value: >-
                 https://vault-0.vault-internal:8200,https://vault-1.vault-internal:8200,https://vault-2.vault-internal:8200
+            - name: VAULT_STORAGE_CLUSTER_MEMBERS
+              value: >-
+                https://consul-0.vault-internal:8500,https://consul-1.vault-internal:8500,https://consul-2.vault-internal:8500
             - name: VAULT_KEY_SHARES
               value: '5'
             - name: VAULT_KEY_THRESHOLD
@@ -67,6 +72,10 @@ The configurations are specified as Environment variables. Below the supported o
 |VAULT_CLUSTER_MEMBERS
 |vault
 |Vault cluster members as URLs specified in a comma separated list
+
+|VAULT_STORAGE_CLUSTER_MEMBERS
+|consul
+|Vault storage cluster members as URLs specified in a comma separated list
 
 |VAULT_KEY_SHARES
 |1
