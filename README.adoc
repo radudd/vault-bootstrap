@@ -62,6 +62,14 @@ spec:
 EOF
 ```
 
+### Extra
+
+If you are choosing to save the root token and unseal keys into a Kubernetes secret, you can re-run the init job for unsealing any of the pods (in case in gets rescheduled). To do this, run the following command
+
+```
+oc get job vault-init -o json | jq 'del(.spec.selector)' | jq 'del(.spec.template.metadata.labels)' | oc replace --force -f -
+```
+
 ## Configuration
 
 The configurations are specified as Environment variables. Below the supported ones.
