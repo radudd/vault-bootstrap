@@ -9,14 +9,22 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-func preflight(clientsetK8s *kubernetes.Clientset, namespace string) {
-	vaultPodsUrls := strings.Split(vaultClusterMembers, ",")
-	storagePodsUrls := strings.Split(storageClusterMembers, ",")
-	podsUrls := append(vaultPodsUrls, storagePodsUrls...)
+func preflight(clientsetK8s *kubernetes.Clientset) {
+	pods, _ := clientsetK8s.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	for _, avPod := range pods.Items {
+		log.Debug(avPod.ObjectMeta.GenerateName)
+	}
+	podsUrls := strings.Split(vaultClusterMembers, ",")
+	if storageClusterMembers != "" {
+		storagePodsUrls := strings.Split(storageClusterMembers, ",")
+		podsUrls = append(podsUrls, storagePodsUrls...)
+	}
+	log.Debugf("Namespace: %s", namespace)
 	c := make(chan string, len(podsUrls))
 	for _, podUrl := range podsUrls {
 		podFqdn, err := url.Parse(podUrl)
@@ -26,7 +34,7 @@ func preflight(clientsetK8s *kubernetes.Clientset, namespace string) {
 		}
 		podName := strings.Split(podFqdn.Hostname(), ".")[0]
 		log.Debugf("Starting goroutine for %s", podName)
-		go checkPodPhase(podName, clientsetK8s, namespace, c)
+		go checkPodPhase(podName, clientsetK8s, c)
 	}
 
 	for range podsUrls {
@@ -35,11 +43,11 @@ func preflight(clientsetK8s *kubernetes.Clientset, namespace string) {
 	}
 
 }
-func checkPodPhase(podName string, clientsetK8s *kubernetes.Clientset, namespace string, c chan string) {
+func checkPodPhase(podName string, clientsetK8s *kubernetes.Clientset, c chan string) {
 	for {
 		podClient, _ := clientsetK8s.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if podClient.Status.Phase != "Running" {
-			log.Infof("%s NOT READY. Waiting...", podName)
+		if podClient.Status.Phase != apiv1.PodRunning {
+			log.Infof("%s NOT ready. Waiting...", podName)
 			time.Sleep(3 * time.Second)
 			continue
 		}

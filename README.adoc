@@ -15,6 +15,7 @@ However, this tool can be extended to save Vault token and unseal Keys to a diff
 
 The container image is hosted at quay.io in the following repo: *quay.io/radudd/vault-bootstrap*
 
+### Scenario 1 - Bootstrap Vault 
 To install Vault Bootstrap to OpenShift or Kubernetes, deploy the following Job:
 
 ```
@@ -36,6 +37,10 @@ spec:
           command:
             - /app/vault-bootstrap
           env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
             - name: VAULT_ADDR
               value: 'https://vault.hashicorp-vault.svc:8200'
             - name: VAULT_CLUSTER_MEMBERS
@@ -43,7 +48,7 @@ spec:
                 https://vault-0.vault-internal:8200,https://vault-1.vault-internal:8200,https://vault-2.vault-internal:8200
             - name: VAULT_STORAGE_CLUSTER_MEMBERS
               value: >-
-                https://consul-0.vault-internal:8500,https://consul-1.vault-internal:8500,https://consul-2.vault-internal:8500
+                http://consul-0.vault-backend-consul:8500,http://consul-1.vault-backend-consul:8500,http://consul-2.vault-backend-consul:8500
             - name: VAULT_KEY_SHARES
               value: '5'
             - name: VAULT_KEY_THRESHOLD
@@ -62,13 +67,60 @@ spec:
 EOF
 ```
 
-### Extra
-
 If you are choosing to save the root token and unseal keys into a Kubernetes secret, you can re-run the init job for unsealing any of the pods (in case in gets rescheduled). To do this, run the following command
 
 ```
 oc get job vault-init -o json | jq 'del(.spec.selector)' | jq 'del(.spec.template.metadata.labels)' | oc replace --force -f -
 ```
+
+### Scenario 2 - Cronjob for unsealing
+
+```
+apiVersion: batch/v1beta1
+	kubeconfigPath := os.Getenv("HOME") + "/.kube/config"
+kind: CronJob
+metadata:
+  name: vault-unseal
+  namespace: hashicorp-vault
+spec:
+  schedule: '*/5 * * * *'
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: vault-unseal
+              image: 'quay.io/radudd/vault-bootstrap:subsequent-job'
+              command:
+                - /app/vault-bootstrap
+              env:
+                - name: NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: VAULT_ADDR
+                  value: 'https://vault.hashicorp-vault.svc:8200'
+                - name: VAULT_CLUSTER_MEMBERS
+                  value: >-
+                    https://vault-0.vault-internal:8200,https://vault-1.vault-internal:8200,https://vault-2.vault-internal:8200
+                - name: VAULT_STORAGE_CLUSTER_MEMBERS
+                  value: >-
+                    https://vault-backend-consul-server-0.vault-backend-consul-server:8500,https://vault-backend-consul-server-1.vault-backend-consul-server:8500,https://vault-backend-consul-server-2.vault-backend-consul-server:8500
+                - name: VAULT_ENABLE_INIT
+                  value: 'false'
+                - name: VAULT_ENABLE_K8SSECRET
+                  value: 'false'
+                - name: VAULT_ENABLE_UNSEAL
+                  value: 'true'
+                - name: VAULT_ENABLE_K8SAUTH
+                  value: 'false'
+              resources: {}
+              terminationMessagePath: /dev/termination-log
+              terminationMessagePolicy: File
+              imagePullPolicy: Always
+          restartPolicy: OnFailure
+```
+
 
 ## Configuration
 
@@ -82,7 +134,7 @@ The configurations are specified as Environment variables. Below the supported o
 |Vault address
 
 |VAULT_CLUSTER_MEMBERS
-|vault
+|https://vault:8200
 |Vault cluster members as URLs specified in a comma separated list
 
 |VAULT_STORAGE_CLUSTER_MEMBERS

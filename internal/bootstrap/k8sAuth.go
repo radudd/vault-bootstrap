@@ -22,7 +22,7 @@ func checkK8sAuth(client *vault.Client) (bool, error) {
 	}
 	return false, nil
 }
-func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset, namespace string) error {
+func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset) error {
 
 	// Enable K8S authentication
 	err := client.Sys().EnableAuthWithOptions("kubernetes/", &vault.EnableAuthOptions{

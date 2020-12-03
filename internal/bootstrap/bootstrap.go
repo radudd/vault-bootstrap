@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -16,7 +15,7 @@ import (
 
 const (
 	DefaultVaultAddr             = "https://vault:8200"
-	DefaultVaultClusterMembers   = "vault"
+	DefaultVaultClusterMembers   = "https://vault:8200"
 	DefaultStorageClusterMembers = ""
 	DefaultVaultKeyShares        = 1
 	DefaultVaultKeyThreshold     = 1
@@ -30,6 +29,7 @@ const (
 )
 
 var (
+	namespace             string
 	vaultAddr             string
 	vaultClusterSize      int
 	vaultClusterMembers   string
@@ -47,6 +47,17 @@ var (
 
 func init() {
 
+	// Extract namespace: https://github.com/kubernetes/kubernetes/pull/63707
+	// Try to extract via Downwards API
+	/*
+		if namespace, ok = os.LookupEnv("NAMESPACE"); !ok {
+			// Fall back to namespace of the service account
+			if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+				namespace = strings.TrimSpace(string(data))
+			}
+		}
+	*/
+
 	if vaultAddr, ok := os.LookupEnv("VAULT_ADDR"); !ok {
 		log.Warn("VAULT_ADDR not set. Defaulting to ", DefaultVaultAddr)
 		vaultAddr = DefaultVaultAddr
@@ -59,8 +70,8 @@ func init() {
 	}
 	storageClusterMembers, ok = os.LookupEnv("VAULT_STORAGE_CLUSTER_MEMBERS")
 	if !ok {
-		log.Warn("VAULT_STORAGE_CLUSTER_MEMBERS not set. Defaulting to ", DefaultStorageClusterMembers)
-		vaultClusterMembers = DefaultVaultClusterMembers
+		log.Warn("VAULT_STORAGE_CLUSTER_MEMBERS not set. Defaulting to NONE")
+		storageClusterMembers = DefaultStorageClusterMembers
 	}
 	if extrVaultKeyShares, ok := os.LookupEnv("VAULT_KEY_SHARES"); !ok {
 		log.Warn("VAULT_KEY_SHARES not set. Defaulting to ", DefaultVaultKeyShares)
@@ -122,29 +133,26 @@ func init() {
 	} else {
 		vaultServiceAccount = extrVaultServiceAccount
 	}
+
 }
 
 // Run Vault bootstrap
 func Run() {
+
 	// Create clientSet for k8s client-go
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
+
+	//k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
+
 	clientsetK8s, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
-
-	// Get current namespace
-	namespaceBs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		log.Error("Cannot extract namespace" + err.Error())
-		os.Exit(1)
-	}
-	namespace := string(namespaceBs)
 
 	// Vault client
 	config := vault.DefaultConfig()
@@ -159,7 +167,10 @@ func Run() {
 		os.Exit(1)
 	}
 
-	preflight(clientsetK8s, namespace)
+	// DEBUG: Hardcode
+	namespace = "hashicorp-vault"
+
+	preflight(clientsetK8s)
 	time.Sleep(5 * time.Second)
 
 	var rootToken *string
@@ -182,11 +193,11 @@ func Run() {
 			// If flag for creating k8s secret is set
 			if vaultK8sSecret {
 				// Check if vault secret exists
-				_, _, err = getValuesFromK8sSecret(clientsetK8s, namespace)
+				_, _, err = getValuesFromK8sSecret(clientsetK8s)
 				if err != nil {
 					// if it fails because secret is not found, create the secret
 					if errors.IsNotFound(err) {
-						if errI := createK8sSecret(rootToken, unsealKeys, clientsetK8s, namespace); errI != nil {
+						if errI := createK8sSecret(rootToken, unsealKeys, clientsetK8s); errI != nil {
 							log.Error(errI.Error())
 							os.Exit(1)
 						}
@@ -200,7 +211,7 @@ func Run() {
 			}
 		} else {
 			log.Info("Vault already initialized")
-			rootToken, unsealKeys, err = getValuesFromK8sSecret(clientsetK8s, namespace)
+			rootToken, unsealKeys, err = getValuesFromK8sSecret(clientsetK8s)
 		}
 	}
 
@@ -251,7 +262,7 @@ func Run() {
 			log.Info("Vault Kubernetes authentication already enabled")
 			return
 		}
-		if err := configureK8sAuth(client, clientsetK8s, namespace); err != nil {
+		if err := configureK8sAuth(client, clientsetK8s); err != nil {
 			log.Error(err.Error())
 			os.Exit(1)
 		}
