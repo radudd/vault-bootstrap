@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/radudd/vault-bootstrap/internal/bootstrap"
@@ -31,4 +32,6 @@ func init() {
 	// set level
 	log.SetLevel(level)
 	log.Info("LogLevel set to " + level.String())
+
+	log.Info(runtime.Version())
 }

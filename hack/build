@@ -1,0 +1,3 @@
+docker build ../build/Dockerfile -t vault-bootstrap
+docker tag vault-bootstrap:latest quay.io/radudd/vault-bootstrap:subsequent-job
+docker push quay.io/radudd/vault-bootstrap:subsequent-job

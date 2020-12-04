@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"strconv"
 
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
@@ -22,18 +23,25 @@ func checkUnseal(client *vault.Client) (bool, error) {
 func shamirUnseal(client *vault.Client, unsealKeys *[]string) error {
 
 	var err error
-	var sealed *vault.SealStatusResponse
+	var sealStatus *vault.SealStatusResponse
 
 	// Loop through the keys and unseal
 	for j := 0; j < vaultKeyThreshold; j++ {
-		sealed, err = client.Sys().Unseal((*unsealKeys)[j])
+		sealStatus, err = client.Sys().Unseal((*unsealKeys)[j])
+		log.Debugf("%s: Unseal progress %s/%s", client.Address(), strconv.Itoa(j+1), strconv.Itoa(vaultKeyThreshold))
 		if err != nil {
 			return err
 		}
 	}
-	if !sealed.Sealed {
+	if !sealStatus.Sealed {
 		log.Info("Vault was successfully unsealed using Shamir keys: ", client.Address())
 		return nil
 	}
-	return fmt.Errorf("Failed unsealing with Shamir keys")
+	respSealStatus, err := client.Sys().SealStatus()
+	if err != nil {
+		return err
+	}
+	respStatus := strconv.Itoa(respSealStatus.Progress)
+
+	return fmt.Errorf("Failed unsealing with Shamir keys: ", respStatus)
 }

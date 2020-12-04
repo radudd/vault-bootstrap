@@ -15,6 +15,7 @@ func getValuesFromK8sSecret(clientsetK8s *kubernetes.Clientset) (*string, *[]str
 	// Check if secret exists
 	secretVault, err := secretClient.Get(context.TODO(), "vault", metav1.GetOptions{})
 	if err != nil {
+		log.Debug("K8s Secret not found")
 		return nil, nil, err
 	}
 	rootToken := string(secretVault.Data["rootToken"])

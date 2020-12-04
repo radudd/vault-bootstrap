@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"context"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -9,6 +11,7 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -16,7 +19,6 @@ import (
 const (
 	DefaultVaultAddr             = "https://vault:8200"
 	DefaultVaultClusterMembers   = "https://vault:8200"
-	DefaultStorageClusterMembers = ""
 	DefaultVaultKeyShares        = 1
 	DefaultVaultKeyThreshold     = 1
 	DefaultVaultInit             = true
@@ -33,7 +35,6 @@ var (
 	vaultAddr             string
 	vaultClusterSize      int
 	vaultClusterMembers   string
-	storageClusterMembers string
 	vaultKeyShares        int
 	vaultKeyThreshold     int
 	vaultInit             bool
@@ -49,14 +50,12 @@ func init() {
 
 	// Extract namespace: https://github.com/kubernetes/kubernetes/pull/63707
 	// Try to extract via Downwards API
-	/*
-		if namespace, ok = os.LookupEnv("NAMESPACE"); !ok {
-			// Fall back to namespace of the service account
-			if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-				namespace = strings.TrimSpace(string(data))
-			}
+	if namespace, ok = os.LookupEnv("NAMESPACE"); !ok {
+		// Fall back to namespace of the service account
+		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+			namespace = strings.TrimSpace(string(data))
 		}
-	*/
+	}
 
 	if vaultAddr, ok := os.LookupEnv("VAULT_ADDR"); !ok {
 		log.Warn("VAULT_ADDR not set. Defaulting to ", DefaultVaultAddr)
@@ -67,11 +66,6 @@ func init() {
 	if !ok {
 		log.Warn("VAULT_CLUSTER_MEMBERS not set. Defaulting to ", DefaultVaultClusterMembers)
 		vaultClusterMembers = DefaultVaultClusterMembers
-	}
-	storageClusterMembers, ok = os.LookupEnv("VAULT_STORAGE_CLUSTER_MEMBERS")
-	if !ok {
-		log.Warn("VAULT_STORAGE_CLUSTER_MEMBERS not set. Defaulting to NONE")
-		storageClusterMembers = DefaultStorageClusterMembers
 	}
 	if extrVaultKeyShares, ok := os.LookupEnv("VAULT_KEY_SHARES"); !ok {
 		log.Warn("VAULT_KEY_SHARES not set. Defaulting to ", DefaultVaultKeyShares)
@@ -154,6 +148,17 @@ func Run() {
 		os.Exit(1)
 	}
 
+	podsList, err := clientsetK8s.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
+	}
+	var pdList []string
+	for _, pd := range podsList.Items {
+		pdList = append(pdList, getPodName(&pd))
+	}
+	log.Debugf("Pods list: %s", strings.Join(pdList, ";"))
+
 	// Vault client
 	config := vault.DefaultConfig()
 	// Skip TLS verification for initialization
@@ -167,16 +172,15 @@ func Run() {
 		os.Exit(1)
 	}
 
-	// DEBUG: Hardcode
-	namespace = "hashicorp-vault"
+	//preflight()
 
-	preflight(clientsetK8s)
 	time.Sleep(5 * time.Second)
 
 	var rootToken *string
 	var unsealKeys *[]string
 
 	// Start with initialization
+
 	if vaultInit {
 		init, err := checkInit(client)
 		if err != nil {
@@ -211,7 +215,6 @@ func Run() {
 			}
 		} else {
 			log.Info("Vault already initialized")
-			rootToken, unsealKeys, err = getValuesFromK8sSecret(clientsetK8s)
 		}
 	}
 
@@ -223,6 +226,13 @@ func Run() {
 	if !init {
 		log.Errorf("Cannot proceed. Vault not initialized")
 		os.Exit(1)
+	}
+
+	// Check if root token and unseal keys in memory
+	// If not, load them from K8s secret
+	if rootToken == nil || unsealKeys == nil {
+		rootToken, unsealKeys, err = getValuesFromK8sSecret(clientsetK8s)
+		log.Debug("Unseal Keys and Root Token loaded successfully")
 	}
 
 	if vaultUnseal {

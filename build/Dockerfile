@@ -1,4 +1,4 @@
-FROM golang:alpine as build
+FROM golang:1.15.2 as build
 
 # set labels for metadata
 LABEL maintainer="Radu Domnu<rdomnu@redhat.com>" \
@@ -9,7 +9,7 @@ LABEL maintainer="Radu Domnu<rdomnu@redhat.com>" \
 ENV GO111MODULE=on \
   CGO_ENABLED=0
 
-RUN apk add git make 
+RUN apt install -y make
 
 # Test and build 
 WORKDIR /build
