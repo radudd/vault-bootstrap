@@ -46,9 +46,6 @@ spec:
             - name: VAULT_CLUSTER_MEMBERS
               value: >-
                 https://vault-0.vault-internal:8200,https://vault-1.vault-internal:8200,https://vault-2.vault-internal:8200
-            - name: VAULT_STORAGE_CLUSTER_MEMBERS
-              value: >-
-                http://consul-0.vault-backend-consul:8500,http://consul-1.vault-backend-consul:8500,http://consul-2.vault-backend-consul:8500
             - name: VAULT_KEY_SHARES
               value: '5'
             - name: VAULT_KEY_THRESHOLD
@@ -103,9 +100,10 @@ spec:
                 - name: VAULT_CLUSTER_MEMBERS
                   value: >-
                     https://vault-0.vault-internal:8200,https://vault-1.vault-internal:8200,https://vault-2.vault-internal:8200
-                - name: VAULT_STORAGE_CLUSTER_MEMBERS
-                  value: >-
-                    https://vault-backend-consul-server-0.vault-backend-consul-server:8500,https://vault-backend-consul-server-1.vault-backend-consul-server:8500,https://vault-backend-consul-server-2.vault-backend-consul-server:8500
+                - name: VAULT_KEY_SHARES
+                  value: '5'
+                - name: VAULT_KEY_THRESHOLD
+                  value: '3'
                 - name: VAULT_ENABLE_INIT
                   value: 'false'
                 - name: VAULT_ENABLE_K8SSECRET

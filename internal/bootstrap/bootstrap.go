@@ -172,7 +172,7 @@ func Run() {
 		os.Exit(1)
 	}
 
-	//preflight()
+	preflight()
 
 	time.Sleep(5 * time.Second)
 
