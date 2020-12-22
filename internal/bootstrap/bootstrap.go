@@ -13,37 +13,37 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 const (
-	DefaultVaultAddr             = "https://vault:8200"
-	DefaultVaultClusterMembers   = "https://vault:8200"
-	DefaultVaultKeyShares        = 1
-	DefaultVaultKeyThreshold     = 1
-	DefaultVaultInit             = true
-	DefaultVaultK8sSecret        = true
-	DefaultVaultUnseal           = true
-	DefaultVaultK8sAuth          = true
-	DefaultVaultServiceAccount   = "vault"
+	DefaultVaultAddr           = "https://vault:8200"
+	DefaultVaultClusterMembers = "https://vault:8200"
+	DefaultVaultKeyShares      = 1
+	DefaultVaultKeyThreshold   = 1
+	DefaultVaultInit           = true
+	DefaultVaultK8sSecret      = true
+	DefaultVaultUnseal         = true
+	DefaultVaultK8sAuth        = true
+	DefaultVaultServiceAccount = "vault"
 
 	VaultSecret = "vault"
 )
 
 var (
-	namespace             string
-	vaultAddr             string
-	vaultClusterSize      int
-	vaultClusterMembers   string
-	vaultKeyShares        int
-	vaultKeyThreshold     int
-	vaultInit             bool
-	vaultK8sSecret        bool
-	vaultUnseal           bool
-	vaultK8sAuth          bool
-	vaultServiceAccount   string
-	err                   error
-	ok                    bool
+	namespace           string
+	vaultAddr           string
+	vaultClusterSize    int
+	vaultClusterMembers string
+	vaultKeyShares      int
+	vaultKeyThreshold   int
+	vaultInit           bool
+	vaultK8sSecret      bool
+	vaultUnseal         bool
+	vaultK8sAuth        bool
+	vaultServiceAccount string
+	err                 error
+	ok                  bool
 )
 
 func init() {
@@ -134,13 +134,13 @@ func init() {
 func Run() {
 
 	// Create clientSet for k8s client-go
-	k8sConfig, err := rest.InClusterConfig()
-	if err != nil {
-		log.Error(err.Error())
-		os.Exit(1)
-	}
+	//k8sConfig, err := rest.InClusterConfig()
+	//if err != nil {
+	//	log.Error(err.Error())
+	//	os.Exit(1)
+	//}
 
-	//k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
+	k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
 
 	clientsetK8s, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
@@ -260,7 +260,11 @@ func Run() {
 	}
 
 	if vaultK8sAuth {
-		time.Sleep(10 * time.Second)
+		up := checkVaultUp(client)
+		if !up {
+			panic("Vault not ready. Cannot proceed with enabling K8s authentication")
+		}
+
 		// set root token
 		client.SetToken(*rootToken)
 		k8sAuth, err := checkK8sAuth(client)

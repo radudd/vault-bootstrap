@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
@@ -12,6 +13,23 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+func checkVaultUp(client *vault.Client) (bool) {
+	for i := 0; i < 5; i++ {
+		hr, err := client.Sys().Health()
+		if err != nil {
+			log.Warn(err.Error(), " Retrying in 3 seconds...")
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		if !hr.Initialized || hr.Sealed {
+			log.Warn("Vault not Initialized/Unsealed. Retrying in 3 seconds...")
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		return true
+	}
+	return false
+}
 func checkK8sAuth(client *vault.Client) (bool, error) {
 	auths, err := client.Logical().Read("sys/auth")
 	if err != nil {
