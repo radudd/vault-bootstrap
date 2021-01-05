@@ -217,6 +217,8 @@ func Run() {
 			log.Info("Vault already initialized")
 		}
 	}
+	time.Sleep(5 * time.Second)
+	log.Info("Waiting for Vault to initialize")
 
 	init, err := checkInit(client)
 	if err != nil {
@@ -227,6 +229,7 @@ func Run() {
 		log.Errorf("Cannot proceed. Vault not initialized")
 		os.Exit(1)
 	}
+	log.Info("Vault initialization completed")
 
 	// Check if root token and unseal keys in memory
 	// If not, load them from K8s secret
