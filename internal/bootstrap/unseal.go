@@ -33,7 +33,7 @@ func shamirUnseal(client *vault.Client, unsealKeys *[]string) error {
 			return err
 		}
 		log.Debugf("%s: Unseal progress %s/%s", client.Address(), strconv.Itoa(sealStatus.Progress), strconv.Itoa(vaultKeyThreshold))
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 		
 	}
 	if !sealStatus.Sealed {
