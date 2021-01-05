@@ -20,7 +20,6 @@ func preflight() {
 	for _, podUrl := range podsUrls {
 		log.Debugf("Starting goroutine for %s", podUrl)
 		go checkVaultStatus(podUrl, c)
-		log.Debugf("Before: Current buffer size is %s", strconv.Itoa(len(c)))
 	}
 	for range podsUrls {
 		log.Infof("%s is Running", <-c)

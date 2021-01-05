@@ -36,16 +36,17 @@ func shamirUnseal(client *vault.Client, unsealKeys []string) {
 	var err error
 	var sealStatus *vault.SealStatusResponse
 
+	out:
 	for {
 		// Loop through the keys and unseal
 		for j := 1; j <= vaultKeyThreshold; j++ {
+			time.Sleep(2 * time.Second)
 			sealStatus, err = client.Sys().Unseal(unsealKeys[j])
 			if err != nil {
-				log.Infof("%s: Cannot unseal", client.Address())
+				log.Infof("%s: %s", client.Address(), err.Error())
+				continue out
 			}
 			log.Debugf("%s: Unseal progress %s/%s", client.Address(), strconv.Itoa(sealStatus.Progress), strconv.Itoa(vaultKeyThreshold))
-			time.Sleep(2 * time.Second)
-
 		}
 		break
 	}

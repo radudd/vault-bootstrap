@@ -242,8 +242,9 @@ func Run() {
 	}
 
 	if vaultUnseal {
-		log.Debugf("Cluster Members: ", vaultClusterMembers)
 		unsealMember(clientFirstMember, *unsealKeys)
+		log.Debugf("Waiting 15 seconds after unsealing first member...")
+		time.Sleep(15 * time.Second)
 		for _, member := range members[1:] {
 			clientConfigMember := &vault.Config{
 				Address: member,
