@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
@@ -26,7 +27,18 @@ func operatorInit(client *vault.Client) (*string, *[]string, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Info("Vault initialized")
+
+	time.Sleep(5 * time.Second)
+	init, err := client.Sys().InitStatus()
+	if err != nil {
+		log.Errorf(err.Error())
+		panic("Cannot proceed. Vault not initialized")
+	}
+	if !init {
+		panic("Cannot proceed. Vault not initialized")
+	}
+
+	log.Info("Vault successfully initialized")
 	return &initResp.RootToken, &initResp.Keys, nil
 }
 

@@ -217,19 +217,6 @@ func Run() {
 			log.Info("Vault already initialized")
 		}
 	}
-	log.Info("Waiting for Vault to initialize")
-	time.Sleep(5 * time.Second)
-
-	init, err := checkInit(client)
-	if err != nil {
-		log.Errorf(err.Error())
-		os.Exit(1)
-	}
-	if !init {
-		log.Errorf("Cannot proceed. Vault not initialized")
-		os.Exit(1)
-	}
-	log.Info("Vault initialization completed")
 
 	// Check if root token and unseal keys in memory
 	// If not, load them from K8s secret
@@ -239,27 +226,9 @@ func Run() {
 	}
 
 	if vaultUnseal {
-		log.Info("Cluster Members: ", vaultClusterMembers)
 		members := strings.Split(vaultClusterMembers, ",")
-		for _, member := range members {
-			clientConfig := &vault.Config{
-				Address: member,
-			}
-			clientConfig.ConfigureTLS(insecureTLS)
-			clientNode, err := vault.NewClient(clientConfig)
-			unsealed, err := checkUnseal(clientNode)
-			if err != nil {
-				log.Errorf(err.Error())
-			}
-			if unsealed {
-				log.Info("Vault already unsealed: ", clientConfig.Address)
-			} else {
-				if err := shamirUnseal(clientNode, unsealKeys); err != nil {
-					log.Error(err.Error())
-					os.Exit(1)
-				}
-			}
-		}
+		go prepareUnseal(members, *unsealKeys)
+		log.Info("Cluster Members: ", vaultClusterMembers)
 	}
 
 	if vaultK8sAuth {

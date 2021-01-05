@@ -24,7 +24,6 @@ func preflight() {
 	}
 	for range podsUrls {
 		log.Infof("%s is Running", <-c)
-		log.Debugf("After: Current buffer size is %s", strconv.Itoa(len(c)))
 	}
 }
 
