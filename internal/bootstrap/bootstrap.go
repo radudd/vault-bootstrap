@@ -159,15 +159,31 @@ func Run() {
 	}
 	log.Debugf("Pods list: %s", strings.Join(pdList, ";"))
 
-	// Vault client
-	config := vault.DefaultConfig()
+	// Define Vault client for Vault LB
+	clientConfigLB := vault.DefaultConfig()
 	// Skip TLS verification for initialization
 	insecureTLS := &vault.TLSConfig{
 		Insecure: true,
 	}
-	config.ConfigureTLS(insecureTLS)
+	clientConfigLB.ConfigureTLS(insecureTLS)
 
-	client, err := vault.NewClient(config)
+	clientLB, err := vault.NewClient(clientConfigLB)
+	if err != nil {
+		os.Exit(1)
+	}
+
+	// Define Vault client for first Vault member
+	members := strings.Split(vaultClusterMembers, ",")
+	// Define main client (vault-0) which will be used for initialization
+	// When using integrated RAFT storage, the vault cluster member that is initialized
+	// needs to be first one which is unsealed
+	// In the unseal part we'll always start with the first member
+	clientConfigFirstMember := &vault.Config{
+		Address: members[0],
+	}
+	clientConfigFirstMember.ConfigureTLS(insecureTLS)
+
+	clientFirstMember, err := vault.NewClient(clientConfigFirstMember)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -182,14 +198,14 @@ func Run() {
 	// Start with initialization
 
 	if vaultInit {
-		init, err := checkInit(client)
+		init, err := checkInit(clientFirstMember)
 		if err != nil {
 			log.Debugf("Starting bootstrap")
 			log.Errorf(err.Error())
 			os.Exit(1)
 		}
 		if !init {
-			rootToken, unsealKeys, err = operatorInit(client)
+			rootToken, unsealKeys, err = operatorInit(clientFirstMember)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(1)
@@ -226,20 +242,35 @@ func Run() {
 	}
 
 	if vaultUnseal {
-		members := strings.Split(vaultClusterMembers, ",")
-		go prepareUnseal(members, *unsealKeys)
-		log.Info("Cluster Members: ", vaultClusterMembers)
+		log.Debugf("Cluster Members: ", vaultClusterMembers)
+		unsealMember(clientFirstMember, *unsealKeys)
+		for _, member := range members[1:] {
+			clientConfigMember := &vault.Config{
+				Address: member,
+			}
+			// Skip TLS verification for initialization
+			insecureTLS := &vault.TLSConfig{
+				Insecure: true,
+			}
+			clientConfigMember.ConfigureTLS(insecureTLS)
+
+			clientMember, err := vault.NewClient(clientConfigMember)
+			if err != nil {
+				os.Exit(1)
+			}
+			unsealMember(clientMember, *unsealKeys)
+		}
 	}
 
 	if vaultK8sAuth {
-		up := checkVaultUp(client)
+		up := checkVaultUp(clientLB)
 		if !up {
 			panic("Vault not ready. Cannot proceed with enabling K8s authentication")
 		}
 
 		// set root token
-		client.SetToken(*rootToken)
-		k8sAuth, err := checkK8sAuth(client)
+		clientLB.SetToken(*rootToken)
+		k8sAuth, err := checkK8sAuth(clientLB)
 		if err != nil {
 			log.Errorf(err.Error())
 			os.Exit(1)
@@ -248,7 +279,7 @@ func Run() {
 			log.Info("Vault Kubernetes authentication already enabled")
 			return
 		}
-		if err := configureK8sAuth(client, clientsetK8s); err != nil {
+		if err := configureK8sAuth(clientLB, clientsetK8s); err != nil {
 			log.Error(err.Error())
 			os.Exit(1)
 		}
