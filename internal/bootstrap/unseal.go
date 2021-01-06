@@ -26,7 +26,7 @@ func unsealMember(pod vaultPod, unsealKeys []string) bool {
 		return false
 	}
 	if unsealed {
-		log.Info("%s: Vault already unsealed", pod.name)
+		log.Infof("%s: Vault already unsealed", pod.name)
 		return false
 	} else {
 		shamirUnseal(pod, unsealKeys)
