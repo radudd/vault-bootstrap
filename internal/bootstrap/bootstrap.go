@@ -213,14 +213,14 @@ func Run() {
 	// Start with initialization
 
 	if vaultInit {
-		init, err := checkInit(vaultFirstPod.client)
+		init, err := checkInit(vaultFirstPod)
 		if err != nil {
 			log.Debugf("Starting bootstrap")
 			log.Errorf(err.Error())
 			os.Exit(1)
 		}
 		if !init {
-			rootToken, unsealKeys, err = operatorInit(vaultFirstPod.client)
+			rootToken, unsealKeys, err = operatorInit(vaultFirstPod)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(1)
