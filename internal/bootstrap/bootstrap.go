@@ -202,7 +202,7 @@ func Run() {
 	// When using integrated RAFT storage, the vault cluster member that is initialized
 	// needs to be first one which is unsealed
 	// In the unseal part we'll always start with the first member
-	clientFirstMember := vaultPods[0].client
+	vaultFirstPod := vaultPods[0]
 	preflight(vaultPods)
 
 	time.Sleep(5 * time.Second)
@@ -213,14 +213,14 @@ func Run() {
 	// Start with initialization
 
 	if vaultInit {
-		init, err := checkInit(clientFirstMember)
+		init, err := checkInit(vaultFirstPod.client)
 		if err != nil {
 			log.Debugf("Starting bootstrap")
 			log.Errorf(err.Error())
 			os.Exit(1)
 		}
 		if !init {
-			rootToken, unsealKeys, err = operatorInit(clientFirstMember)
+			rootToken, unsealKeys, err = operatorInit(vaultFirstPod.client)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(1)
@@ -257,13 +257,13 @@ func Run() {
 	}
 
 	if vaultUnseal {
-		unsealed := unsealMember(clientFirstMember, *unsealKeys)
+		unsealed := unsealMember(vaultFirstPod, *unsealKeys)
 		if unsealed {
 			log.Debugf("Waiting 15 seconds after unsealing first member...")
 			time.Sleep(15 * time.Second)
 		}
 		for _, vaultPod := range vaultPods[1:] {
-			unsealMember(vaultPod.client, *unsealKeys)
+			unsealMember(vaultPod, *unsealKeys)
 		}
 	}
 
