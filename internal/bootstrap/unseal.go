@@ -19,15 +19,18 @@ func checkUnseal(client *vault.Client) (bool, error) {
 	return true, nil
 }
 
-func unsealMember(client *vault.Client, unsealKeys []string) {
+func unsealMember(client *vault.Client, unsealKeys []string) bool {
 	unsealed, err := checkUnseal(client)
 	if err != nil {
 		log.Errorf(err.Error())
+		return false
 	}
 	if unsealed {
-		log.Info("Vault already unsealed: ", client.Address())
+		log.Info("%s: Vault already unsealed", client.Address())
+		return false
 	} else {
 		shamirUnseal(client, unsealKeys)
+		return true
 	}
 }
 
@@ -38,6 +41,7 @@ func shamirUnseal(client *vault.Client, unsealKeys []string) {
 
 	out:
 	for {
+		log.Infof("%s: Starting unsealing", client.Address())
 		// Loop through the keys and unseal
 		for j := 1; j <= vaultKeyThreshold; j++ {
 			time.Sleep(2 * time.Second)
@@ -51,6 +55,6 @@ func shamirUnseal(client *vault.Client, unsealKeys []string) {
 		break
 	}
 	if !sealStatus.Sealed {
-		log.Info("Vault was successfully unsealed using Shamir keys: ", client.Address())
+		log.Infof("%s: Vault was successfully unsealed using Shamir keys", client.Address())
 	}
 }

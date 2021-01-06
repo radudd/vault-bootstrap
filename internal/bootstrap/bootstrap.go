@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -172,23 +173,37 @@ func Run() {
 		os.Exit(1)
 	}
 
-	// Define Vault client for first Vault member
-	members := strings.Split(vaultClusterMembers, ",")
+	// Slice of maps containing vault pods details
+	var vaultPods []vaultPod
+	vaultMembersUrls := strings.Split(vaultClusterMembers, ",")
+	// Generate the slice from Env variable
+	for _, member := range vaultMembersUrls {
+		var pod vaultPod
+		podFqdn, _ := url.Parse(member)
+		pod.fqdn = podFqdn.Hostname()
+		pod.name = strings.Split(podFqdn.Hostname(), ".")[0]
+		// Define main client (vault-0) which will be used for initialization
+		// When using integrated RAFT storage, the vault cluster member that is initialized
+		// needs to be first one which is unsealed
+		// In the unseal part we'll always start with the first member
+		clientConfig := &vault.Config{
+			Address: pod.fqdn,
+		}
+		clientConfig.ConfigureTLS(insecureTLS)
+
+		client, err := vault.NewClient(clientConfig)
+		if err != nil {
+			os.Exit(1)
+		}
+		pod.client = client
+		vaultPods = append(vaultPods, pod)
+	}
 	// Define main client (vault-0) which will be used for initialization
 	// When using integrated RAFT storage, the vault cluster member that is initialized
 	// needs to be first one which is unsealed
 	// In the unseal part we'll always start with the first member
-	clientConfigFirstMember := &vault.Config{
-		Address: members[0],
-	}
-	clientConfigFirstMember.ConfigureTLS(insecureTLS)
-
-	clientFirstMember, err := vault.NewClient(clientConfigFirstMember)
-	if err != nil {
-		os.Exit(1)
-	}
-
-	preflight()
+	clientFirstMember := vaultPods[0].client
+	preflight(vaultPods)
 
 	time.Sleep(5 * time.Second)
 
@@ -242,31 +257,20 @@ func Run() {
 	}
 
 	if vaultUnseal {
-		unsealMember(clientFirstMember, *unsealKeys)
-		log.Debugf("Waiting 15 seconds after unsealing first member...")
-		time.Sleep(15 * time.Second)
-		for _, member := range members[1:] {
-			clientConfigMember := &vault.Config{
-				Address: member,
-			}
-			// Skip TLS verification for initialization
-			insecureTLS := &vault.TLSConfig{
-				Insecure: true,
-			}
-			clientConfigMember.ConfigureTLS(insecureTLS)
-
-			clientMember, err := vault.NewClient(clientConfigMember)
-			if err != nil {
-				os.Exit(1)
-			}
-			unsealMember(clientMember, *unsealKeys)
+		unsealed := unsealMember(clientFirstMember, *unsealKeys)
+		if unsealed {
+			log.Debugf("Waiting 15 seconds after unsealing first member...")
+			time.Sleep(15 * time.Second)
+		}
+		for _, vaultPod := range vaultPods[1:] {
+			unsealMember(vaultPod.client, *unsealKeys)
 		}
 	}
 
 	if vaultK8sAuth {
 		up := checkVaultUp(clientLB)
 		if !up {
-			panic("Vault not ready. Cannot proceed with enabling K8s authentication")
+			panic("K8s authentication: Vault not ready. Cannot proceed")
 		}
 
 		// set root token
@@ -277,7 +281,7 @@ func Run() {
 			os.Exit(1)
 		}
 		if k8sAuth {
-			log.Info("Vault Kubernetes authentication already enabled")
+			log.Info("K8s authentication: Already enabled")
 			return
 		}
 		if err := configureK8sAuth(clientLB, clientsetK8s); err != nil {

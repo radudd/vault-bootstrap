@@ -3,9 +3,7 @@ package bootstrap
 import (
 	"crypto/tls"
 	"net/http"
-	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -14,34 +12,31 @@ import (
 // codes defined by /sys/health
 // if any of those codes, Vault is up
 
-func preflight() {
-	podsUrls := strings.Split(vaultClusterMembers, ",")
-	c := make(chan string, len(podsUrls))
-	for _, podUrl := range podsUrls {
-		log.Debugf("Starting goroutine for %s", podUrl)
-		go checkVaultStatus(podUrl, c)
+func preflight(vaultPods []vaultPod) {
+	c := make(chan string, len(vaultPods))
+	for _, pod := range vaultPods {
+		log.Debugf("Starting goroutine for %s", pod)
+		go checkVaultStatus(pod, c)
 	}
-	for range podsUrls {
+	for range vaultPods {
 		log.Infof("%s is Running", <-c)
 	}
 }
 
-func checkVaultStatus(podUrl string, c chan string) {
+func checkVaultStatus(pod vaultPod, c chan string) {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	podFqdn, _ := url.Parse(podUrl)
-	podName := strings.Split(podFqdn.Hostname(), ".")[0]
 	for {
-		resp, err := http.Get(podUrl + "/v1/sys/health")
+		resp, err := http.Get(pod.fqdn + "/v1/sys/health")
 		if err != nil {
-			log.Debugf("%s: %s", podName, err.Error())
+			log.Debugf("%s: %s", pod.name, err.Error())
 			time.Sleep(3 * time.Second)
 			continue
 		} else if !find(vaultReadyStatusCodes, resp.StatusCode) {
-			log.Debugf("%s: HTTP Status %s", podName, strconv.Itoa(resp.StatusCode))
+			log.Debugf("%s: HTTP Status %s", pod.name, strconv.Itoa(resp.StatusCode))
 			time.Sleep(3 * time.Second)
 			continue
 		}
-		c <- podUrl
+		c <- pod.name
 		break
 	}
 }

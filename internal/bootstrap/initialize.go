@@ -38,7 +38,7 @@ func operatorInit(client *vault.Client) (*string, *[]string, error) {
 		panic("Cannot proceed. Vault not initialized")
 	}
 
-	log.Info("Vault successfully initialized")
+	log.Infof("%s: Vault successfully initialized", client.Address())
 	return &initResp.RootToken, &initResp.Keys, nil
 }
 
