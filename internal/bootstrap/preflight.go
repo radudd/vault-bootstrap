@@ -15,7 +15,7 @@ import (
 func preflight(vaultPods []vaultPod) {
 	c := make(chan string, len(vaultPods))
 	for _, pod := range vaultPods {
-		log.Debugf("Starting goroutine for %s", pod)
+		log.Debugf("Starting goroutine for %s", pod.name)
 		go checkVaultStatus(pod, c)
 	}
 	for range vaultPods {
