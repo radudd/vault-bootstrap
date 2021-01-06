@@ -180,7 +180,7 @@ func Run() {
 	for _, member := range vaultMembersUrls {
 		var pod vaultPod
 		podFqdn, _ := url.Parse(member)
-		pod.fqdn = podFqdn.Hostname()
+		pod.fqdn = member
 		pod.name = strings.Split(podFqdn.Hostname(), ".")[0]
 		// Define main client (vault-0) which will be used for initialization
 		// When using integrated RAFT storage, the vault cluster member that is initialized
