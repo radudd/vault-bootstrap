@@ -1,49 +1,42 @@
 package bootstrap
 
 import (
-	"context"
-	"net/url"
-	"os"
+	"crypto/tls"
+	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
-func preflight(clientsetK8s *kubernetes.Clientset, namespace string) {
-	vaultPodsUrls := strings.Split(vaultClusterMembers, ",")
-	storagePodsUrls := strings.Split(storageClusterMembers, ",")
-	podsUrls := append(vaultPodsUrls, storagePodsUrls...)
-	c := make(chan string, len(podsUrls))
-	for _, podUrl := range podsUrls {
-		podFqdn, err := url.Parse(podUrl)
-		if err != nil {
-			log.Error(err.Error())
-			os.Exit(1)
-		}
-		podName := strings.Split(podFqdn.Hostname(), ".")[0]
-		log.Debugf("Starting goroutine for %s", podName)
-		go checkPodPhase(podName, clientsetK8s, namespace, c)
-	}
+// codes defined by /sys/health
+// if any of those codes, Vault is up
 
-	for range podsUrls {
+func preflight(vaultPods []vaultPod) {
+	c := make(chan string, len(vaultPods))
+	for _, pod := range vaultPods {
+		log.Debugf("Starting goroutine for %s", pod.name)
+		go checkVaultStatus(pod, c)
+	}
+	for range vaultPods {
 		log.Infof("%s is Running", <-c)
-		log.Debugf("Current buffer size is %s", strconv.Itoa(len(c)))
 	}
-
 }
-func checkPodPhase(podName string, clientsetK8s *kubernetes.Clientset, namespace string, c chan string) {
+
+func checkVaultStatus(pod vaultPod, c chan string) {
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	for {
-		podClient, _ := clientsetK8s.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
-		if podClient.Status.Phase != "Running" {
-			log.Infof("%s NOT READY. Waiting...", podName)
+		resp, err := http.Get(pod.fqdn + "/v1/sys/health")
+		if err != nil {
+			log.Debugf("%s: %s", pod.name, err.Error())
+			time.Sleep(3 * time.Second)
+			continue
+		} else if !find(vaultReadyStatusCodes, resp.StatusCode) {
+			log.Debugf("%s: HTTP Status %s", pod.name, strconv.Itoa(resp.StatusCode))
 			time.Sleep(3 * time.Second)
 			continue
 		}
-		c <- podName
+		c <- pod.name
 		break
 	}
 }

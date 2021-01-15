@@ -3,30 +3,42 @@ package bootstrap
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
 )
 
-func checkInit(client *vault.Client) (bool, error) {
-	init, err := client.Sys().InitStatus()
+func checkInit(pod vaultPod) (bool, error) {
+	init, err := pod.client.Sys().InitStatus()
 	if err != nil {
 		return false, err
 	}
 	return init, nil
 }
 
-func operatorInit(client *vault.Client) (*string, *[]string, error) {
+func operatorInit(pod vaultPod) (*string, *[]string, error) {
 
 	initReq := &vault.InitRequest{
 		SecretShares:    vaultKeyShares,
 		SecretThreshold: vaultKeyThreshold,
 	}
-	initResp, err := client.Sys().Init(initReq)
+	initResp, err := pod.client.Sys().Init(initReq)
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Info("Vault successfully initialized")
+
+	time.Sleep(5 * time.Second)
+	init, err := pod.client.Sys().InitStatus()
+	if err != nil {
+		log.Errorf(err.Error())
+		panic("Cannot proceed. Vault not initialized")
+	}
+	if !init {
+		panic("Cannot proceed. Vault not initialized")
+	}
+
+	log.Infof("%s: Vault successfully initialized", pod.name)
 	return &initResp.RootToken, &initResp.Keys, nil
 }
 

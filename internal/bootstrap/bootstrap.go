@@ -1,7 +1,9 @@
 package bootstrap
 
 import (
+	"context"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -10,42 +12,51 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
 
 const (
-	DefaultVaultAddr             = "https://vault:8200"
-	DefaultVaultClusterMembers   = "vault"
-	DefaultStorageClusterMembers = ""
-	DefaultVaultKeyShares        = 1
-	DefaultVaultKeyThreshold     = 1
-	DefaultVaultInit             = true
-	DefaultVaultK8sSecret        = true
-	DefaultVaultUnseal           = true
-	DefaultVaultK8sAuth          = true
-	DefaultVaultServiceAccount   = "vault"
+	DefaultVaultAddr           = "https://vault:8200"
+	DefaultVaultClusterMembers = "https://vault:8200"
+	DefaultVaultKeyShares      = 1
+	DefaultVaultKeyThreshold   = 1
+	DefaultVaultInit           = true
+	DefaultVaultK8sSecret      = true
+	DefaultVaultUnseal         = true
+	DefaultVaultK8sAuth        = true
+	DefaultVaultServiceAccount = "vault"
 
 	VaultSecret = "vault"
 )
 
 var (
-	vaultAddr             string
-	vaultClusterSize      int
-	vaultClusterMembers   string
-	storageClusterMembers string
-	vaultKeyShares        int
-	vaultKeyThreshold     int
-	vaultInit             bool
-	vaultK8sSecret        bool
-	vaultUnseal           bool
-	vaultK8sAuth          bool
-	vaultServiceAccount   string
-	err                   error
-	ok                    bool
+	namespace           string
+	vaultAddr           string
+	vaultClusterSize    int
+	vaultClusterMembers string
+	vaultKeyShares      int
+	vaultKeyThreshold   int
+	vaultInit           bool
+	vaultK8sSecret      bool
+	vaultUnseal         bool
+	vaultK8sAuth        bool
+	vaultServiceAccount string
+	err                 error
+	ok                  bool
 )
 
 func init() {
+
+	// Extract namespace: https://github.com/kubernetes/kubernetes/pull/63707
+	// Try to extract via Downwards API
+	if namespace, ok = os.LookupEnv("NAMESPACE"); !ok {
+		// Fall back to namespace of the service account
+		if data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+			namespace = strings.TrimSpace(string(data))
+		}
+	}
 
 	if vaultAddr, ok := os.LookupEnv("VAULT_ADDR"); !ok {
 		log.Warn("VAULT_ADDR not set. Defaulting to ", DefaultVaultAddr)
@@ -55,11 +66,6 @@ func init() {
 	vaultClusterMembers, ok = os.LookupEnv("VAULT_CLUSTER_MEMBERS")
 	if !ok {
 		log.Warn("VAULT_CLUSTER_MEMBERS not set. Defaulting to ", DefaultVaultClusterMembers)
-		vaultClusterMembers = DefaultVaultClusterMembers
-	}
-	storageClusterMembers, ok = os.LookupEnv("VAULT_STORAGE_CLUSTER_MEMBERS")
-	if !ok {
-		log.Warn("VAULT_STORAGE_CLUSTER_MEMBERS not set. Defaulting to ", DefaultStorageClusterMembers)
 		vaultClusterMembers = DefaultVaultClusterMembers
 	}
 	if extrVaultKeyShares, ok := os.LookupEnv("VAULT_KEY_SHARES"); !ok {
@@ -122,59 +128,99 @@ func init() {
 	} else {
 		vaultServiceAccount = extrVaultServiceAccount
 	}
+
 }
 
 // Run Vault bootstrap
 func Run() {
+
 	// Create clientSet for k8s client-go
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
+
+	//k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
+
 	clientsetK8s, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
 
-	// Get current namespace
-	namespaceBs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	podsList, err := clientsetK8s.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		log.Error("Cannot extract namespace" + err.Error())
+		log.Error(err.Error())
 		os.Exit(1)
 	}
-	namespace := string(namespaceBs)
+	var pdList []string
+	for _, pd := range podsList.Items {
+		pdList = append(pdList, getPodName(&pd))
+	}
+	log.Debugf("Pods list: %s", strings.Join(pdList, ";"))
 
-	// Vault client
-	config := vault.DefaultConfig()
+	// Define Vault client for Vault LB
+	clientConfigLB := vault.DefaultConfig()
 	// Skip TLS verification for initialization
 	insecureTLS := &vault.TLSConfig{
 		Insecure: true,
 	}
-	config.ConfigureTLS(insecureTLS)
+	clientConfigLB.ConfigureTLS(insecureTLS)
 
-	client, err := vault.NewClient(config)
+	clientLB, err := vault.NewClient(clientConfigLB)
 	if err != nil {
 		os.Exit(1)
 	}
 
-	preflight(clientsetK8s, namespace)
+	// Slice of maps containing vault pods details
+	var vaultPods []vaultPod
+	vaultMembersUrls := strings.Split(vaultClusterMembers, ",")
+	// Generate the slice from Env variable
+	for _, member := range vaultMembersUrls {
+		var pod vaultPod
+		podFqdn, _ := url.Parse(member)
+		pod.fqdn = member
+		pod.name = strings.Split(podFqdn.Hostname(), ".")[0]
+		// Define main client (vault-0) which will be used for initialization
+		// When using integrated RAFT storage, the vault cluster member that is initialized
+		// needs to be first one which is unsealed
+		// In the unseal part we'll always start with the first member
+		clientConfig := &vault.Config{
+			Address: pod.fqdn,
+		}
+		clientConfig.ConfigureTLS(insecureTLS)
+
+		client, err := vault.NewClient(clientConfig)
+		if err != nil {
+			os.Exit(1)
+		}
+		pod.client = client
+		vaultPods = append(vaultPods, pod)
+	}
+	// Define main client (vault-0) which will be used for initialization
+	// When using integrated RAFT storage, the vault cluster member that is initialized
+	// needs to be first one which is unsealed
+	// In the unseal part we'll always start with the first member
+	vaultFirstPod := vaultPods[0]
+	preflight(vaultPods)
+
 	time.Sleep(5 * time.Second)
 
 	var rootToken *string
 	var unsealKeys *[]string
 
 	// Start with initialization
+
 	if vaultInit {
-		init, err := checkInit(client)
+		init, err := checkInit(vaultFirstPod)
 		if err != nil {
 			log.Debugf("Starting bootstrap")
 			log.Errorf(err.Error())
 			os.Exit(1)
 		}
 		if !init {
-			rootToken, unsealKeys, err = operatorInit(client)
+			rootToken, unsealKeys, err = operatorInit(vaultFirstPod)
 			if err != nil {
 				log.Error(err.Error())
 				os.Exit(1)
@@ -182,11 +228,11 @@ func Run() {
 			// If flag for creating k8s secret is set
 			if vaultK8sSecret {
 				// Check if vault secret exists
-				_, _, err = getValuesFromK8sSecret(clientsetK8s, namespace)
+				_, _, err = getValuesFromK8sSecret(clientsetK8s)
 				if err != nil {
 					// if it fails because secret is not found, create the secret
 					if errors.IsNotFound(err) {
-						if errI := createK8sSecret(rootToken, unsealKeys, clientsetK8s, namespace); errI != nil {
+						if errI := createK8sSecret(rootToken, unsealKeys, clientsetK8s); errI != nil {
 							log.Error(errI.Error())
 							os.Exit(1)
 						}
@@ -200,58 +246,45 @@ func Run() {
 			}
 		} else {
 			log.Info("Vault already initialized")
-			rootToken, unsealKeys, err = getValuesFromK8sSecret(clientsetK8s, namespace)
 		}
 	}
 
-	init, err := checkInit(client)
-	if err != nil {
-		log.Errorf(err.Error())
-		os.Exit(1)
-	}
-	if !init {
-		log.Errorf("Cannot proceed. Vault not initialized")
-		os.Exit(1)
+	// Check if root token and unseal keys in memory
+	// If not, load them from K8s secret
+	if rootToken == nil || unsealKeys == nil {
+		rootToken, unsealKeys, err = getValuesFromK8sSecret(clientsetK8s)
+		log.Debug("Unseal Keys and Root Token loaded successfully")
 	}
 
 	if vaultUnseal {
-		log.Info("Cluster Members: ", vaultClusterMembers)
-		members := strings.Split(vaultClusterMembers, ",")
-		for _, member := range members {
-			clientConfig := &vault.Config{
-				Address: member,
-			}
-			clientConfig.ConfigureTLS(insecureTLS)
-			clientNode, err := vault.NewClient(clientConfig)
-			unsealed, err := checkUnseal(clientNode)
-			if err != nil {
-				log.Errorf(err.Error())
-			}
-			if unsealed {
-				log.Info("Vault already unsealed: ", clientConfig.Address)
-			} else {
-				if err := shamirUnseal(clientNode, unsealKeys); err != nil {
-					log.Error(err.Error())
-					os.Exit(1)
-				}
-			}
+		unsealed := unsealMember(vaultFirstPod, *unsealKeys)
+		if unsealed {
+			log.Debugf("Waiting 15 seconds after unsealing first member...")
+			time.Sleep(15 * time.Second)
+		}
+		for _, vaultPod := range vaultPods[1:] {
+			unsealMember(vaultPod, *unsealKeys)
 		}
 	}
 
 	if vaultK8sAuth {
-		time.Sleep(10 * time.Second)
+		up := checkVaultUp(clientLB)
+		if !up {
+			panic("K8s authentication: Vault not ready. Cannot proceed")
+		}
+
 		// set root token
-		client.SetToken(*rootToken)
-		k8sAuth, err := checkK8sAuth(client)
+		clientLB.SetToken(*rootToken)
+		k8sAuth, err := checkK8sAuth(clientLB)
 		if err != nil {
 			log.Errorf(err.Error())
 			os.Exit(1)
 		}
 		if k8sAuth {
-			log.Info("Vault Kubernetes authentication already enabled")
+			log.Info("K8s authentication: Already enabled")
 			return
 		}
-		if err := configureK8sAuth(client, clientsetK8s, namespace); err != nil {
+		if err := configureK8sAuth(clientLB, clientsetK8s); err != nil {
 			log.Error(err.Error())
 			os.Exit(1)
 		}

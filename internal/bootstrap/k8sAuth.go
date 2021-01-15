@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
@@ -12,6 +13,23 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+func checkVaultUp(client *vault.Client) (bool) {
+	for i := 0; i < 5; i++ {
+		hr, err := client.Sys().Health()
+		if err != nil {
+			log.Warn(err.Error(), "K8s authentication: Retrying in 3 seconds...")
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		if !hr.Initialized || hr.Sealed {
+			log.Warn("K8s authentication: Vault not Initialized/Unsealed. Retrying ...")
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		return true
+	}
+	return false
+}
 func checkK8sAuth(client *vault.Client) (bool, error) {
 	auths, err := client.Logical().Read("sys/auth")
 	if err != nil {
@@ -22,7 +40,7 @@ func checkK8sAuth(client *vault.Client) (bool, error) {
 	}
 	return false, nil
 }
-func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset, namespace string) error {
+func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset) error {
 
 	// Enable K8S authentication
 	err := client.Sys().EnableAuthWithOptions("kubernetes/", &vault.EnableAuthOptions{
@@ -36,7 +54,7 @@ func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset, 
 	saClient := clientsetK8s.CoreV1().ServiceAccounts(namespace)
 	saClientVault, err := saClient.Get(context.TODO(), vaultServiceAccount, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Cant't get vault service account - ", err.Error())
+		return fmt.Errorf("K8s authentication: Cant't get vault service account - ", err.Error())
 	}
 
 	secretSaVaultName := saClientVault.Secrets[0].Name
@@ -44,7 +62,7 @@ func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset, 
 
 	secretSaVault, err := clientsetK8s.CoreV1().Secrets(namespace).Get(context.TODO(), secretSaVaultName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("Cant't get secret for vault service account - ", err.Error())
+		return fmt.Errorf("K8s authentication: Cant't get secret for vault service account - ", err.Error())
 	}
 	vaultJwt := secretSaVault.Data["token"]
 
@@ -57,7 +75,7 @@ func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset, 
 	// Get K8S API URL
 	k8sApiHost, ok := os.LookupEnv("KUBERNETES_PORT_443_TCP_ADDR")
 	if !ok {
-		return fmt.Errorf("Invalid Kubernetes API config")
+		return fmt.Errorf("K8s authentication: Invalid Kubernetes API config")
 	}
 
 	k8sApiUrl := fmt.Sprintf("https://%s:443", k8sApiHost)
@@ -74,6 +92,6 @@ func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset, 
 	if err != nil {
 		return err
 	}
-	log.Info("Vault K8S authentication enabled")
+	log.Info("K8s authentication: Successfully enabled")
 	return nil
 }

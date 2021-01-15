@@ -1,7 +1,8 @@
 package bootstrap
 
 import (
-	"fmt"
+	"strconv"
+	"time"
 
 	vault "github.com/hashicorp/vault/api"
 	log "github.com/sirupsen/logrus"
@@ -18,22 +19,42 @@ func checkUnseal(client *vault.Client) (bool, error) {
 	return true, nil
 }
 
+func unsealMember(pod vaultPod, unsealKeys []string) bool {
+	unsealed, err := checkUnseal(pod.client)
+	if err != nil {
+		log.Errorf(err.Error())
+		return false
+	}
+	if unsealed {
+		log.Infof("%s: Vault already unsealed", pod.name)
+		return false
+	} else {
+		shamirUnseal(pod, unsealKeys)
+		return true
+	}
+}
+
 // Unseal Vault using Shamir keys
-func shamirUnseal(client *vault.Client, unsealKeys *[]string) error {
-
+func shamirUnseal(pod vaultPod, unsealKeys []string) {
 	var err error
-	var sealed *vault.SealStatusResponse
+	var sealStatus *vault.SealStatusResponse
 
-	// Loop through the keys and unseal
-	for j := 0; j < vaultKeyThreshold; j++ {
-		sealed, err = client.Sys().Unseal((*unsealKeys)[j])
-		if err != nil {
-			return err
+	out:
+	for {
+		log.Infof("%s: Starting unsealing", pod.name)
+		// Loop through the keys and unseal
+		for j := 1; j <= vaultKeyThreshold; j++ {
+			time.Sleep(2 * time.Second)
+			sealStatus, err = pod.client.Sys().Unseal(unsealKeys[j])
+			if err != nil {
+				log.Infof("%s: %s", pod.name, err.Error())
+				continue out
+			}
+			log.Infof("%s: Unseal progress %s/%s", pod.name, strconv.Itoa(sealStatus.Progress), strconv.Itoa(vaultKeyThreshold))
 		}
+		break
 	}
-	if !sealed.Sealed {
-		log.Info("Vault was successfully unsealed using Shamir keys: ", client.Address())
-		return nil
+	if !sealStatus.Sealed {
+		log.Infof("%s: Vault was successfully unsealed using Shamir keys", pod.name)
 	}
-	return fmt.Errorf("Failed unsealing with Shamir keys")
 }
