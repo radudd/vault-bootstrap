@@ -8,10 +8,12 @@
 * Checks if Vault and Storage Backend components are up before starting any action
 * Possibility to run as a job in Kubernetes
 
-## 0.2 (December 7th, 2020)
+## 0.2 (January 15th, 2021)
 * Change preflight checks by verifying if Vault is up using Vault API instead of K8s API
 * No need to check Storage Backend components in preflight
 * Possibility to load unseal keys and token from Kubernetes secret if Vault is not initialized with this job and they are not available in memory
 * Possibility to run as a CronJob with Unseal only
 * Added more debug messages
+* When HA: Working with RAFT storage, as well as Consul
+* When HA: Initialize a specific Vault pod instead of using the load-balancer (when using RAFT, same pod needs to be both initialized and initially unsealed)
 * Bump Go version to 1.15.2
