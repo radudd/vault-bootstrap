@@ -54,13 +54,13 @@ func Unseal() {
 	}
 
 	// Get unseal keys
-	var unsealKeys *[]string
+	var unsealKeys []string
 	unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
 	if err != nil {
 		log.Fatalf("Cannot load Unseal Keys from secret %s and key %s", vaultSecretUnseal, "vaultData")
 	}
 	log.Debugf("Unseal keys: %s", *unsealKeysString)
-	*unsealKeys = strings.Split(*unsealKeysString, ";")
+	unsealKeys = strings.Split(*unsealKeysString, ";")
 
 	// Define Vault pod
 	var pod vaultPod
@@ -80,7 +80,7 @@ func Unseal() {
 	}
 	pod.client = client
 	for {
-		_ = unsealMember(pod, *unsealKeys)
+		_ = unsealMember(pod, unsealKeys)
 		time.Sleep(time.Duration(unsealInterval) * time.Second)
 	}
 }
