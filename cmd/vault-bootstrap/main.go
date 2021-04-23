@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/radudd/vault-bootstrap/internal/bootstrap"
-	"github.com/radudd/vault-bootstrap/internal/unsealer"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,7 +20,7 @@ func main() {
 		bootstrap.Run()
 	} else if *runningMode == "sidecar" {
 		log.Info("Running in sidecar mode...")
-		unsealer.Run()
+		bootstrap.Unseal()
 	} else {
 		panic("Running mode must be 'sidecar' or 'job'")
 	}
