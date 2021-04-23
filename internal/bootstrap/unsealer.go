@@ -40,44 +40,46 @@ func init() {
 	}
 }
 func Unseal() {
+	//k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
+	// Create clientSet for k8s client-go
+	k8sConfig, err := rest.InClusterConfig()
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
+	}
+	clientsetK8s, err := kubernetes.NewForConfig(k8sConfig)
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
+	}
+
+	// Get unseal keys
+	var unsealKeys *[]string
+	unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
+	if err != nil {
+		log.Fatalf("Cannot load Unseal Keys from secret %s and key %s", vaultSecretUnseal, "vaultData")
+	}
+	log.Debugf("Unseal keys: %s", *unsealKeysString)
+	*unsealKeys = strings.Split(*unsealKeysString, ";")
+
+	// Define Vault pod
+	var pod vaultPod
+	insecureTLS := &vault.TLSConfig{
+		Insecure: true,
+	}
+	pod.fqdn = "https://localhost:8200"
+	pod.name = "localhost:8200"
+	clientConfig := &vault.Config{
+		Address: pod.fqdn,
+	}
+	clientConfig.ConfigureTLS(insecureTLS)
+
+	client, err := vault.NewClient(clientConfig)
+	if err != nil {
+		os.Exit(1)
+	}
+	pod.client = client
 	for {
-		// Create clientSet for k8s client-go
-		k8sConfig, err := rest.InClusterConfig()
-		if err != nil {
-			log.Error(err.Error())
-			os.Exit(1)
-		}
-		clientsetK8s, err := kubernetes.NewForConfig(k8sConfig)
-		if err != nil {
-			log.Error(err.Error())
-			os.Exit(1)
-		}
-
-		// Get unseal keys
-		var unsealKeys *[]string
-		unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
-		if err != nil {
-			log.Fatalf("Cannot load Unseal Keys from secret %s and key %s", vaultSecretUnseal,"vaultData")
-		}
-		*unsealKeys = strings.Split(*unsealKeysString, ";")
-
-		// Define Vault pod
-		var pod vaultPod
-		insecureTLS := &vault.TLSConfig{
-			Insecure: true,
-		}
-		pod.fqdn = "https://localhost:8200"
-		pod.name = "localhost:8200"
-		clientConfig := &vault.Config{
-			Address: pod.fqdn,
-		}
-		clientConfig.ConfigureTLS(insecureTLS)
-
-		client, err := vault.NewClient(clientConfig)
-		if err != nil {
-			os.Exit(1)
-		}
-		pod.client = client
 		_ = unsealMember(pod, *unsealKeys)
 		time.Sleep(time.Duration(unsealInterval) * time.Second)
 	}
