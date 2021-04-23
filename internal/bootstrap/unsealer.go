@@ -1,4 +1,4 @@
-package unsealer
+package bootstrap
 
 import (
 	"os"
@@ -9,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	vault "github.com/hashicorp/vault/api"
-	"github.com/radudd/vault-bootstrap/internal/bootstrap"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -40,7 +39,7 @@ func init() {
 		unsealInterval = intExtrUnsealInterval
 	}
 }
-func Run() {
+func Unseal() {
 	for {
 		// Create clientSet for k8s client-go
 		k8sConfig, err := rest.InClusterConfig()
@@ -56,21 +55,21 @@ func Run() {
 
 		// Get unseal keys
 		var unsealKeys *[]string
-		unsealKeysString, err := bootstrap.GetValuesFromK8sSecret(clientsetK8s, bootstrap.VaultSecretUnseal)
+		unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
 		if err != nil {
-			log.Fatalf("Cannot load Unseal Keys from secret %s and key %s", bootstrap.VaultSecretUnseal,"vaultData")
+			log.Fatalf("Cannot load Unseal Keys from secret %s and key %s", vaultSecretUnseal,"vaultData")
 		}
 		*unsealKeys = strings.Split(*unsealKeysString, ";")
 
 		// Define Vault pod
-		var pod bootstrap.VaultPod
+		var pod vaultPod
 		insecureTLS := &vault.TLSConfig{
 			Insecure: true,
 		}
-		pod.Fqdn = "https://localhost:8200"
-		pod.Name = "localhost:8200"
+		pod.fqdn = "https://localhost:8200"
+		pod.name = "localhost:8200"
 		clientConfig := &vault.Config{
-			Address: pod.Fqdn,
+			Address: pod.fqdn,
 		}
 		clientConfig.ConfigureTLS(insecureTLS)
 
@@ -78,8 +77,8 @@ func Run() {
 		if err != nil {
 			os.Exit(1)
 		}
-		pod.Client = client
-		_ = bootstrap.UnsealMember(pod, *unsealKeys)
+		pod.client = client
+		_ = unsealMember(pod, *unsealKeys)
 		time.Sleep(time.Duration(unsealInterval) * time.Second)
 	}
 }

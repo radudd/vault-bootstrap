@@ -52,7 +52,7 @@ func configureK8sAuth(client *vault.Client, clientsetK8s *kubernetes.Clientset) 
 	}
 
 	saClient := clientsetK8s.CoreV1().ServiceAccounts(namespace)
-	saClientVault, err := saClient.Get(context.TODO(), VaultServiceAccount, metav1.GetOptions{})
+	saClientVault, err := saClient.Get(context.TODO(), vaultServiceAccount, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("K8s authentication: Cant't get vault service account - ", err.Error())
 	}

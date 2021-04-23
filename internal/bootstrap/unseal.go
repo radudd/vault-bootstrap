@@ -19,42 +19,42 @@ func checkUnseal(client *vault.Client) (bool, error) {
 	return true, nil
 }
 
-func UnsealMember(pod VaultPod, unsealKeys []string) bool {
-	unsealed, err := checkUnseal(pod.Client)
+func unsealMember(pod vaultPod, unsealKeys []string) bool {
+	unsealed, err := checkUnseal(pod.client)
 	if err != nil {
 		log.Errorf(err.Error())
 		return false
 	}
 	if unsealed {
-		log.Infof("%s: Vault already unsealed", pod.Name)
+		log.Infof("%s: Vault already unsealed", pod.name)
 		return false
 	} else {
-		ShamirUnseal(pod, unsealKeys)
+		shamirUnseal(pod, unsealKeys)
 		return true
 	}
 }
 
 // Unseal Vault using Shamir keys
-func ShamirUnseal(pod VaultPod, unsealKeys []string) {
+func shamirUnseal(pod vaultPod, unsealKeys []string) {
 	var err error
 	var sealStatus *vault.SealStatusResponse
 
 	out:
 	for {
-		log.Infof("%s: Starting unsealing", pod.Name)
+		log.Infof("%s: Starting unsealing", pod.name)
 		// Loop through the keys and unseal
 		for j := 1; j <= vaultKeyThreshold; j++ {
 			time.Sleep(2 * time.Second)
-			sealStatus, err = pod.Client.Sys().Unseal(unsealKeys[j])
+			sealStatus, err = pod.client.Sys().Unseal(unsealKeys[j])
 			if err != nil {
-				log.Infof("%s: %s", pod.Name, err.Error())
+				log.Infof("%s: %s", pod.name, err.Error())
 				continue out
 			}
-			log.Infof("%s: Unseal progress %s/%s", pod.Name, strconv.Itoa(sealStatus.Progress), strconv.Itoa(vaultKeyThreshold))
+			log.Infof("%s: Unseal progress %s/%s", pod.name, strconv.Itoa(sealStatus.Progress), strconv.Itoa(vaultKeyThreshold))
 		}
 		break
 	}
 	if !sealStatus.Sealed {
-		log.Infof("%s: Vault was successfully unsealed using Shamir keys", pod.Name)
+		log.Infof("%s: Vault was successfully unsealed using Shamir keys", pod.name)
 	}
 }

@@ -45,9 +45,9 @@ var (
 	err                 error
 	ok                  bool
 
-	VaultServiceAccount string
-	VaultSecretRoot     string
-	VaultSecretUnseal   string
+	vaultServiceAccount string
+	vaultSecretRoot     string
+	vaultSecretUnseal   string
 )
 
 func init() {
@@ -127,22 +127,22 @@ func init() {
 	}
 	if extrVaultServiceAccount, ok := os.LookupEnv("VAULT_SERVICE_ACCOUNT"); !ok {
 		log.Warn("VAULT_SERVICE_ACCOUNT not set. Defaulting to ", DefaultVaultServiceAccount)
-		VaultServiceAccount = DefaultVaultServiceAccount
+		vaultServiceAccount = DefaultVaultServiceAccount
 	} else {
-		VaultServiceAccount = extrVaultServiceAccount
+		vaultServiceAccount = extrVaultServiceAccount
 	}
 
 	if extrVaultSecretRoot, ok := os.LookupEnv("VAULT_SECRET_ROOT"); !ok {
 		log.Warn("VAULT_SECRET_ROOT not set. Defaulting to ", DefaultVaultSecretRoot)
-		VaultSecretRoot = DefaultVaultSecretRoot
+		vaultSecretRoot = DefaultVaultSecretRoot
 	} else {
-		VaultSecretRoot = extrVaultSecretRoot
+		vaultSecretRoot = extrVaultSecretRoot
 	}
 	if extrVaultSecretUnseal, ok := os.LookupEnv("VAULT_SECRET_UNSEAL"); !ok {
 		log.Warn("VAULT_SECRET_UNSEAL not set. Defaulting to ", DefaultVaultSecretUnseal)
-		VaultSecretUnseal = DefaultVaultSecretUnseal
+		vaultSecretUnseal = DefaultVaultSecretUnseal
 	} else {
-		VaultSecretUnseal = extrVaultSecretUnseal
+		vaultSecretUnseal = extrVaultSecretUnseal
 	}
 
 }
@@ -190,20 +190,20 @@ func Run() {
 	}
 
 	// Slice of maps containing vault pods details
-	var vaultPods []VaultPod
+	var vaultPods []vaultPod
 	vaultMembersUrls := strings.Split(vaultClusterMembers, ",")
 	// Generate the slice from Env variable
 	for _, member := range vaultMembersUrls {
-		var pod VaultPod
+		var pod vaultPod
 		podFqdn, _ := url.Parse(member)
-		pod.Fqdn = member
-		pod.Name = strings.Split(podFqdn.Hostname(), ".")[0]
+		pod.fqdn = member
+		pod.name = strings.Split(podFqdn.Hostname(), ".")[0]
 		// Define main client (vault-0) which will be used for initialization
 		// When using integrated RAFT storage, the vault cluster member that is initialized
 		// needs to be first one which is unsealed
 		// In the unseal part we'll always start with the first member
 		clientConfig := &vault.Config{
-			Address: pod.Fqdn,
+			Address: pod.fqdn,
 		}
 		clientConfig.ConfigureTLS(insecureTLS)
 
@@ -211,7 +211,7 @@ func Run() {
 		if err != nil {
 			os.Exit(1)
 		}
-		pod.Client = client
+		pod.client = client
 		vaultPods = append(vaultPods, pod)
 	}
 	// Define main client (vault-0) which will be used for initialization
@@ -244,11 +244,11 @@ func Run() {
 			// If flag for creating k8s secrets is set
 			if vaultK8sSecret {
 				// Check if vault secret root exists
-				_, err = GetValuesFromK8sSecret(clientsetK8s, VaultSecretRoot)
+				_, err = getValuesFromK8sSecret(clientsetK8s, vaultSecretRoot)
 				if err != nil {
 					// if it fails because secret is not found, create the secret
 					if errors.IsNotFound(err) {
-						if errI := createK8sSecret(clientsetK8s, &VaultSecretRoot, rootToken); errI != nil {
+						if errI := createK8sSecret(clientsetK8s, &vaultSecretRoot, rootToken); errI != nil {
 							log.Error(errI.Error())
 							os.Exit(1)
 						}
@@ -258,12 +258,12 @@ func Run() {
 					}
 				}
 				// Check if vault secret unseal exists
-				_, err = GetValuesFromK8sSecret(clientsetK8s, VaultSecretUnseal)
+				_, err = getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
 				if err != nil {
 					// if it fails because secret is not found, create the secret
 					if errors.IsNotFound(err) {
 						unsealKeysString := strings.Join(*unsealKeys, ";")
-						if errI := createK8sSecret(clientsetK8s, &VaultSecretUnseal, &unsealKeysString); errI != nil {
+						if errI := createK8sSecret(clientsetK8s, &vaultSecretUnseal, &unsealKeysString); errI != nil {
 							log.Error(errI.Error())
 							os.Exit(1)
 						}
@@ -282,7 +282,7 @@ func Run() {
 
 	// Check if unseal keys in memory and if not load them
 	if unsealKeys == nil {
-		unsealKeysString, err := GetValuesFromK8sSecret(clientsetK8s, VaultSecretUnseal)
+		unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
 		if err != nil {
 			panic("Cannot load Unseal Keys")
 		}
@@ -291,13 +291,13 @@ func Run() {
 	}
 
 	if vaultUnseal {
-		unsealed := UnsealMember(vaultFirstPod, *unsealKeys)
+		unsealed := unsealMember(vaultFirstPod, *unsealKeys)
 		if unsealed {
 			log.Debugf("Waiting 15 seconds after unsealing first member...")
 			time.Sleep(15 * time.Second)
 		}
 		for _, vaultPod := range vaultPods[1:] {
-			UnsealMember(vaultPod, *unsealKeys)
+			unsealMember(vaultPod, *unsealKeys)
 		}
 	}
 
