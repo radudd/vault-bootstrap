@@ -40,6 +40,8 @@ func init() {
 	}
 }
 func Unseal() {
+
+	time.Sleep(20 * time.Second)
 	//k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
 	// Create clientSet for k8s client-go
 	k8sConfig, err := rest.InClusterConfig()
