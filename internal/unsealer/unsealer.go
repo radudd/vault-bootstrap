@@ -58,7 +58,7 @@ func Run() {
 		var unsealKeys *[]string
 		unsealKeysString, err := bootstrap.GetValuesFromK8sSecret(clientsetK8s, bootstrap.VaultSecretUnseal)
 		if err != nil {
-			log.Fatal("Cannot load Unseal Keys")
+			log.Fatalf("Cannot load Unseal Keys from secret %s and key %s", bootstrap.VaultSecretUnseal,"vaultData")
 		}
 		*unsealKeys = strings.Split(*unsealKeysString, ";")
 
