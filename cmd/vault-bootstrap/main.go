@@ -14,10 +14,13 @@ import (
 func main() {
 
 	runningMode := flag.String("mode", "job", "running mode: job or sidecar")
+	flag.Parse()
 
 	if *runningMode == "job" {
+		log.Info("Running in job mode...")
 		bootstrap.Run()
 	} else if *runningMode == "sidecar" {
+		log.Info("Running in sidecar mode...")
 		unsealer.Run()
 	} else {
 		panic("Running mode must be 'sidecar' or 'job'")
