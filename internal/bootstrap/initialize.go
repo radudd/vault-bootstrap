@@ -9,27 +9,27 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func checkInit(pod vaultPod) (bool, error) {
-	init, err := pod.client.Sys().InitStatus()
+func checkInit(pod VaultPod) (bool, error) {
+	init, err := pod.Client.Sys().InitStatus()
 	if err != nil {
 		return false, err
 	}
 	return init, nil
 }
 
-func operatorInit(pod vaultPod) (*string, *[]string, error) {
+func operatorInit(pod VaultPod) (*string, *[]string, error) {
 
 	initReq := &vault.InitRequest{
 		SecretShares:    vaultKeyShares,
 		SecretThreshold: vaultKeyThreshold,
 	}
-	initResp, err := pod.client.Sys().Init(initReq)
+	initResp, err := pod.Client.Sys().Init(initReq)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	time.Sleep(5 * time.Second)
-	init, err := pod.client.Sys().InitStatus()
+	init, err := pod.Client.Sys().InitStatus()
 	if err != nil {
 		log.Errorf(err.Error())
 		panic("Cannot proceed. Vault not initialized")
@@ -38,7 +38,7 @@ func operatorInit(pod vaultPod) (*string, *[]string, error) {
 		panic("Cannot proceed. Vault not initialized")
 	}
 
-	log.Infof("%s: Vault successfully initialized", pod.name)
+	log.Infof("%s: Vault successfully initialized", pod.Name)
 	return &initResp.RootToken, &initResp.Keys, nil
 }
 

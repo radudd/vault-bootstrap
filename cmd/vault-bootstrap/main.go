@@ -1,16 +1,27 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"runtime"
 	"strings"
 
 	"github.com/radudd/vault-bootstrap/internal/bootstrap"
+	"github.com/radudd/vault-bootstrap/internal/unsealer"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	bootstrap.Run()
+
+	runningMode := flag.String("mode", "job", "running mode: job or sidecar")
+
+	if *runningMode == "job" {
+		bootstrap.Run()
+	} else if *runningMode == "sidecar" {
+		unsealer.Run()
+	} else {
+		panic("Running mode must be 'sidecar' or 'job'")
+	}
 }
 
 func init() {

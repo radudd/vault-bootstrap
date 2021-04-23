@@ -2,7 +2,6 @@ package bootstrap
 
 import (
 	"context"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	apiv1 "k8s.io/api/core/v1"
@@ -10,30 +9,30 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func getValuesFromK8sSecret(clientsetK8s *kubernetes.Clientset) (*string, *[]string, error) {
+func GetValuesFromK8sSecret(clientsetK8s *kubernetes.Clientset, secretName string) (*string, error) {
 	secretClient := clientsetK8s.CoreV1().Secrets(namespace)
 	// Check if secret exists
-	secretVault, err := secretClient.Get(context.TODO(), "vault", metav1.GetOptions{})
+	secretVault, err := secretClient.Get(context.TODO(), secretName, metav1.GetOptions{})
 	if err != nil {
 		log.Debug("K8s Secret not found")
-		return nil, nil, err
+		return nil, err
 	}
-	rootToken := string(secretVault.Data["rootToken"])
-	unsealKeys := strings.Split(string(secretVault.Data["unsealKeys"]), ";")
-	return &rootToken, &unsealKeys, nil
+	vaultSecretData := string(secretVault.Data["vaultData"])
+	//unsealKeys := strings.Split(string(secretVault.Data["unsealKeys"]), ";")
+	return &vaultSecretData, nil
 }
 
-func createK8sSecret(rootToken *string, unsealKeys *[]string, clientsetK8s *kubernetes.Clientset) error {
-
+//func createK8sSecret(rootToken *string, unsealKeys *[]string, clientsetK8s *kubernetes.Clientset) error {
+func createK8sSecret(clientsetK8s *kubernetes.Clientset, secretName *string, vaultSecretData *string) error {
 	secretClient := clientsetK8s.CoreV1().Secrets(namespace)
 	secret := &apiv1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "vault",
+			Name: *secretName,
 		},
 		Type: apiv1.SecretTypeOpaque,
 		StringData: map[string]string{
-			"rootToken":  *rootToken,
-			"unsealKeys": strings.Join(*unsealKeys, ";"),
+			"vaultData": *vaultSecretData,
+			//"unsealKeys": strings.Join(*unsealKeys, ";"),
 		},
 	}
 
