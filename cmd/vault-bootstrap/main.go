@@ -12,15 +12,15 @@ import (
 
 func main() {
 
-	runningMode := flag.String("mode", "job", "running mode: job or sidecar")
+	runningMode := flag.String("mode", "job", "running mode: job or init-container")
 	flag.Parse()
 
 	if *runningMode == "job" {
 		log.Info("Running in job mode...")
 		bootstrap.Run()
-	} else if *runningMode == "sidecar" {
-		log.Info("Running in sidecar mode...")
-		bootstrap.Unseal()
+	} else if *runningMode == "init-container" {
+		log.Info("Running in init-container mode...")
+		bootstrap.Init()
 	} else {
 		panic("Running mode must be 'sidecar' or 'job'")
 	}
