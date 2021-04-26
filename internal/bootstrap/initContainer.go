@@ -40,6 +40,7 @@ func Init() {
 	}
 	pod, err := clientsetK8s.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
+		log.Error(err.Error())
 		panic("Cannot extract Pod information from Kubernetes API")
 	}
 	containerImage := pod.Status.ContainerStatuses[0].Image
@@ -99,6 +100,7 @@ func Init() {
 
 	result, err := jobClient.Create(context.TODO(), job, metav1.CreateOptions{})
 	if err != nil {
+		log.Error(err.Error())
 		panic("Failed to create Vault Unseal Job")
 	}
 	log.Info("Created Vault Unseal Job ", result.GetObjectMeta().GetName())
