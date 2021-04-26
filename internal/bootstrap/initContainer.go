@@ -55,6 +55,7 @@ func Init() {
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
+					RestartPolicy: "OnFailure",
 					Containers: []corev1.Container{
 						{
 							Name:  "unsealer",
