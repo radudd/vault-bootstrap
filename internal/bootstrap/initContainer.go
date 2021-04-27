@@ -45,7 +45,7 @@ func Init() {
 		log.Error(err.Error())
 		panic("Cannot extract Pod information from Kubernetes API")
 	}
-	containerImage := pod.Status.ContainerStatuses[0].Image
+	containerImage := pod.Status.InitContainerStatuses[0].Image
 
 	randomString := strings.Replace(uuid.New().String(), "-", "", -1)
 	jobName := podName + "-usealer-" + randomString[0:4]
