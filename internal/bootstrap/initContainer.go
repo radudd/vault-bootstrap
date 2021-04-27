@@ -36,6 +36,8 @@ func Init() {
 	if !ok {
 		panic("Cannot extract Pod name from environment variables")
 	}
+	// eventually parametrize http scheme and port
+	podUrl := "https://" + podName + ":8200"
 	namespace, ok := os.LookupEnv("VAULT_K8S_NAMESPACE")
 	if !ok {
 		panic("Cannot extract Namespace name from environment variables")
@@ -86,7 +88,7 @@ func Init() {
 								},
 								{
 									Name:  "VAULT_CLUSTER_MEMBERS",
-									Value: podName,
+									Value: podUrl,
 								},
 								{
 									Name:  "VAULT_KEY_SHARES",
