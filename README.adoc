@@ -70,55 +70,40 @@ If you are choosing to save the root token and unseal keys into a Kubernetes sec
 oc get job vault-init -o json | jq 'del(.spec.selector)' | jq 'del(.spec.template.metadata.labels)' | oc replace --force -f -
 ```
 
-### Scenario 2 - Cronjob for unsealing
+### Scenario 2 - init Container for unsealing
+This tool can be run in `init-container` mode, which can be used if we want to perform auto-unsealing from K8s secret. 
+In this mode, the initContainer will spawn up a `vault-bootstrap` job configured to perform only unsealing only for the podis attached to. 
+To perform this scenario, add the following definition to the Vault StatefulSet definition
 
 ```
-apiVersion: batch/v1beta1
-	kubeconfigPath := os.Getenv("HOME") + "/.kube/config"
-kind: CronJob
-metadata:
-  name: vault-unseal
-  namespace: hashicorp-vault
-spec:
-  schedule: '*/5 * * * *'
-  jobTemplate:
-    spec:
-      template:
-        spec:
-          containers:
-            - name: vault-unseal
-              image: 'quay.io/radudd/vault-bootstrap:subsequent-job'
-              command:
-                - /app/vault-bootstrap
-              env:
-                - name: NAMESPACE
-                  valueFrom:
-                    fieldRef:
-                      fieldPath: metadata.namespace
-                - name: VAULT_ADDR
-                  value: 'https://vault.hashicorp-vault.svc:8200'
-                - name: VAULT_CLUSTER_MEMBERS
-                  value: >-
-                    https://vault-0.vault-internal:8200,https://vault-1.vault-internal:8200,https://vault-2.vault-internal:8200
-                - name: VAULT_KEY_SHARES
-                  value: '5'
-                - name: VAULT_KEY_THRESHOLD
-                  value: '3'
-                - name: VAULT_ENABLE_INIT
-                  value: 'false'
-                - name: VAULT_ENABLE_K8SSECRET
-                  value: 'false'
-                - name: VAULT_ENABLE_UNSEAL
-                  value: 'true'
-                - name: VAULT_ENABLE_K8SAUTH
-                  value: 'false'
-              resources: {}
-              terminationMessagePath: /dev/termination-log
-              terminationMessagePolicy: File
-              imagePullPolicy: Always
-          restartPolicy: OnFailure
+      initContainers:
+        - name: vault-unsealer
+          image: 'quay.io/radudd/vault-bootstrap:init-container-unsealer'
+          command:
+            - /app/vault-bootstrap
+          args:
+            - '--mode'
+            - init-container
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+          env:
+            - name: VAULT_JOB_IMAGE
+              value: quay.io/radudd/vault-bootstrap:latest
+            - name: VAULT_KEY_SHARES
+              value: '1'
+            - name: VAULT_KEY_THRESHOLD
+              value: '1'
+            - name: VAULT_K8S_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: VAULT_K8S_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace  
 ```
-
 
 ## Configuration
 
@@ -162,4 +147,9 @@ The configurations are specified as Environment variables. Below the supported o
 |VAULT_ENABLE_K8SAUTH
 |true
 |Enable Kubernetes authentication for Vault
+|===
+
+|VAULT_JOB_IMAGE
+|N/A
+|Relevant only for `init-container` mode. If set, deploy the `vault-bootstrap` job from this image.
 |===

@@ -1,4 +1,4 @@
-FROM golang:1.15.2 as build
+FROM quay.io/radudd/golang:1.15.2 as build
 
 # set labels for metadata
 LABEL maintainer="Radu Domnu<rdomnu@redhat.com>" \

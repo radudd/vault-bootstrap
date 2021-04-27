@@ -1,6 +1,6 @@
 ## 0.1 (November 1st, 2020)
 * Initial Version
-* May the following actions: 
+* Can perform the following actions: 
 ** Vault initialize
 ** Save Root Token and Unseal Keys to K8s secret or print them to STDOUT
 ** Unseal all members
@@ -17,3 +17,7 @@
 * When HA: Working with RAFT storage, as well as Consul
 * When HA: Initialize a specific Vault pod instead of using the load-balancer (when using RAFT, same pod needs to be both initialized and initially unsealed)
 * Bump Go version to 1.15.2
+
+## 0.3 (April 27th, 2021)
+* Separate secrets with configurable names for Vault root token and Vault unseal keys
+* Addded a different mode of operation: `init-container`. This mode should be used to run this tool as an init container. This init container will spawn up a new `vault-bootstrap` job that can perform unsealing.

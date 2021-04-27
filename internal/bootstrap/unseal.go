@@ -43,9 +43,9 @@ func shamirUnseal(pod vaultPod, unsealKeys []string) {
 	for {
 		log.Infof("%s: Starting unsealing", pod.name)
 		// Loop through the keys and unseal
-		for j := 1; j <= vaultKeyThreshold; j++ {
+		for j := 0; j < vaultKeyThreshold; j++ {
 			time.Sleep(2 * time.Second)
-			sealStatus, err = pod.client.Sys().Unseal(unsealKeys[j])
+			sealStatus, err = pod.client.Sys().Unseal(unsealKeys[0])
 			if err != nil {
 				log.Infof("%s: %s", pod.name, err.Error())
 				continue out
