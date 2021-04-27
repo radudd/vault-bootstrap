@@ -36,18 +36,21 @@ func Init() {
 	if !ok {
 		panic("Cannot extract Pod name from environment variables")
 	}
-	// eventually parametrize http scheme and port
-	podUrl := "https://" + podName + ":8200"
-	namespace, ok := os.LookupEnv("VAULT_K8S_NAMESPACE")
-	if !ok {
-		panic("Cannot extract Namespace name from environment variables")
-	}
 	pod, err := clientsetK8s.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 	if err != nil {
 		log.Error(err.Error())
 		panic("Cannot extract Pod information from Kubernetes API")
 	}
+	// eventually parametrize http scheme and port
+	podUrl := "https://" + podName + "." + pod.Spec.Subdomain + ":8200"
+	log.Infof("Pod URL: %s", podUrl)
+
 	containerImage := pod.Status.InitContainerStatuses[0].Image
+
+	namespace, ok := os.LookupEnv("VAULT_K8S_NAMESPACE")
+	if !ok {
+		panic("Cannot extract Namespace name from environment variables")
+	}
 
 	randomString := strings.Replace(uuid.New().String(), "-", "", -1)
 	jobName := podName + "-usealer-" + randomString[0:4]
@@ -68,7 +71,6 @@ func Init() {
 						{
 							Name:  "unsealer",
 							Image: containerImage,
-							//Command: []string{"sh", "-xc"},
 							Env: []corev1.EnvVar{
 								{
 									Name:  "VAULT_ENABLE_INIT",
