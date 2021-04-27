@@ -60,8 +60,7 @@ func Init() {
 						{
 							Name:  "unsealer",
 							Image: containerImage,
-							Command: []string{"/app/vault-bootstrap"},
-							Args: []string{"--mode", "--init-container"},
+							//Command: []string{"sh", "-xc"},
 							Env: []corev1.EnvVar{
 								{
 									Name:  "VAULT_ENABLE_INIT",

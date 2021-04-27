@@ -12,9 +12,27 @@ import (
 
 func main() {
 
+	/*
+		if os.Args[1] == "job" || len(os.Args) == 0 {
+			log.Info("Running in job mode...")
+			bootstrap.Run()
+		} else if os.Args[1] == "init-container" {
+			log.Info("Running in init-container mode...")
+			bootstrap.Init()
+		} else {
+			panic("First argument(running mode) must be 'job' or 'init-container'")
+		}
+		//runningMode := flag.String("mode", "job", "running mode: job or init-container")
+		httpCheckUrl := flag.String("http-check", "http://www.redhat.com", "http check mode")
+		flag.Parse()
+		flag.Visit(func(f *flag.Flag){
+			if f.Name == "http-check" {
+				httpCheck.Check(*httpCheckUrl)
+			}
+		})
+	*/
 	runningMode := flag.String("mode", "job", "running mode: job or init-container")
 	flag.Parse()
-
 	if *runningMode == "job" {
 		log.Info("Running in job mode...")
 		bootstrap.Run()
