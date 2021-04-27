@@ -4,7 +4,9 @@ import (
 	"context"
 	"os"
 	"strconv"
+	"strings"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -45,17 +47,21 @@ func Init() {
 	}
 	containerImage := pod.Status.ContainerStatuses[0].Image
 
+	randomString := strings.Replace(uuid.New().String(), "-", "", -1)
+	jobName := podName + "-usealer-" + randomString[0:4]
+
 	// Define Job
 	jobClient := clientsetK8s.BatchV1().Jobs(namespace)
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "vault-unsealer",
+			Name:      jobName,
 			Namespace: namespace,
 		},
 		Spec: batchv1.JobSpec{
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
-					RestartPolicy: "OnFailure",
+					RestartPolicy:      "OnFailure",
+					ServiceAccountName: vaultServiceAccount,
 					Containers: []corev1.Container{
 						{
 							Name:  "unsealer",
