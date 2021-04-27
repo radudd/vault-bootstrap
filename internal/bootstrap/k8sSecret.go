@@ -9,10 +9,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func getValuesFromK8sSecret(clientsetK8s *kubernetes.Clientset, secretName string) (*string, error) {
+func getValuesFromK8sSecret(clientsetK8s *kubernetes.Clientset, secretName *string) (*string, error) {
 	secretClient := clientsetK8s.CoreV1().Secrets(namespace)
 	// Check if secret exists
-	secretVault, err := secretClient.Get(context.TODO(), secretName, metav1.GetOptions{})
+	secretVault, err := secretClient.Get(context.TODO(), *secretName, metav1.GetOptions{})
 	if err != nil {
 		log.Debug("K8s Secret not found")
 		return nil, err

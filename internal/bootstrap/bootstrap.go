@@ -94,6 +94,9 @@ func Run() {
 	var rootToken *string
 	var unsealKeys *[]string
 
+	pVaultSecretRoot := &vaultSecretRoot
+	pVaultSecretUnseal := &vaultSecretUnseal
+
 	// Start with initialization
 
 	if vaultInit {
@@ -112,7 +115,7 @@ func Run() {
 			// If flag for creating k8s secrets is set
 			if vaultK8sSecret {
 				// Check if vault secret root exists
-				_, err = getValuesFromK8sSecret(clientsetK8s, vaultSecretRoot)
+				_, err = getValuesFromK8sSecret(clientsetK8s, pVaultSecretRoot)
 				if err != nil {
 					// if it fails because secret is not found, create the secret
 					if errors.IsNotFound(err) {
@@ -126,7 +129,7 @@ func Run() {
 					}
 				}
 				// Check if vault secret unseal exists
-				_, err = getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
+				_, err = getValuesFromK8sSecret(clientsetK8s, pVaultSecretRoot)
 				if err != nil {
 					// if it fails because secret is not found, create the secret
 					if errors.IsNotFound(err) {
@@ -150,11 +153,12 @@ func Run() {
 
 	// Check if unseal keys in memory and if not load them
 	if unsealKeys == nil {
-		unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
+		unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, pVaultSecretUnseal)
 		if err != nil {
 			panic("Cannot load Unseal Keys")
 		}
-		*unsealKeys = strings.Split(*unsealKeysString, ";")
+		npUnsealKeys := strings.Split(*unsealKeysString, ";")
+		unsealKeys = &npUnsealKeys
 		log.Debug("Unseal Keys loaded successfully")
 	}
 

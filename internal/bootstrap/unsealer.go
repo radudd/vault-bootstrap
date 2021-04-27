@@ -57,7 +57,7 @@ func Unseal() {
 
 	// Get unseal keys
 	var unsealKeys []string
-	unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, vaultSecretUnseal)
+	unsealKeysString, err := getValuesFromK8sSecret(clientsetK8s, &vaultSecretUnseal)
 	if err != nil {
 		log.Fatalf("Cannot load Unseal Keys from secret %s and key %s", vaultSecretUnseal, "vaultData")
 	}
