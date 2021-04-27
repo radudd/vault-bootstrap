@@ -15,7 +15,10 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func Init() {
+var vaultInitContainerImage string
+var vaultJobImage string
+
+func InitContainer() {
 	// Create clientSet for k8s client-go
 	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -45,7 +48,14 @@ func Init() {
 	podUrl := "https://" + podName + "." + pod.Spec.Subdomain + ":8200"
 	log.Infof("Pod URL: %s", podUrl)
 
-	containerImage := pod.Status.InitContainerStatuses[0].Image
+	vaultInitContainerImage = pod.Status.InitContainerStatuses[0].Image
+	// Get Vault image from env variables (if defined)
+	if extrVaultJobImage, ok := os.LookupEnv("VAULT_JOB_IMAGE"); !ok {
+		log.Warn("VAULT_JOB_IMAGE is not set. Defaulting to ", vaultInitContainerImage)
+		vaultJobImage = vaultInitContainerImage
+	} else {
+		vaultJobImage = extrVaultJobImage
+	}
 
 	namespace, ok := os.LookupEnv("VAULT_K8S_NAMESPACE")
 	if !ok {
@@ -70,7 +80,7 @@ func Init() {
 					Containers: []corev1.Container{
 						{
 							Name:  "unsealer",
-							Image: containerImage,
+							Image: vaultJobImage,
 							Env: []corev1.EnvVar{
 								{
 									Name:  "VAULT_ENABLE_INIT",

@@ -38,7 +38,7 @@ func main() {
 		bootstrap.Run()
 	} else if *runningMode == "init-container" {
 		log.Info("Running in init-container mode...")
-		bootstrap.Init()
+		bootstrap.InitContainer()
 	} else {
 		panic("Running mode must be 'sidecar' or 'job'")
 	}

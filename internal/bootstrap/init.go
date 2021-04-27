@@ -136,5 +136,4 @@ func init() {
 	} else {
 		vaultSecretUnseal = extrVaultSecretUnseal
 	}
-
 }
