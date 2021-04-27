@@ -12,20 +12,20 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/rest"
 )
 
 // Run Vault bootstrap
 func Run() {
 
 	// Create clientSet for k8s client-go
-	//k8sConfig, err := rest.InClusterConfig()
-	//if err != nil {
-	//	log.Error(err.Error())
-	//	os.Exit(1)
-	//}
+	k8sConfig, err := rest.InClusterConfig()
+	if err != nil {
+		log.Error(err.Error())
+		os.Exit(1)
+	}
 
-	k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
+	//k8sConfig, _ := clientcmd.BuildConfigFromFlags("", os.Getenv("HOME")+"/.kube/config")
 
 	clientsetK8s, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
