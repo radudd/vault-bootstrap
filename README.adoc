@@ -149,6 +149,11 @@ The configurations are specified as Environment variables. Below the supported o
 |Enable Kubernetes authentication for Vault
 |===
 
+|VAULT_AUTOUNSEAL
+|false
+|If Autounsealing is enabled
+|===
+
 |VAULT_JOB_IMAGE
 |N/A
 |Relevant only for `init-container` mode. If set, deploy the `vault-bootstrap` job from this image.

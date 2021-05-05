@@ -162,7 +162,7 @@ func Run() {
 		log.Debug("Unseal Keys loaded successfully")
 	}
 
-	if vaultUnseal {
+	if vaultUnseal && !vaultAutounseal {
 		unsealed := unsealMember(vaultFirstPod, *unsealKeys)
 		if unsealed {
 			log.Debugf("Waiting 15 seconds after unsealing first member...")

@@ -18,6 +18,7 @@ const (
 	DefaultVaultK8sSecret      = true
 	DefaultVaultUnseal         = true
 	DefaultVaultK8sAuth        = true
+	DefaultVaultAutounseal     = false
 	DefaultVaultServiceAccount = "vault"
 	DefaultVaultSecretRoot     = "vault-root-token"
 	DefaultVaultSecretUnseal   = "vault-unseal-keys"
@@ -34,6 +35,7 @@ var (
 	vaultK8sSecret      bool
 	vaultUnseal         bool
 	vaultK8sAuth        bool
+	vaultAutounseal		bool
 	err                 error
 	ok                  bool
 
@@ -135,5 +137,14 @@ func init() {
 		vaultSecretUnseal = DefaultVaultSecretUnseal
 	} else {
 		vaultSecretUnseal = extrVaultSecretUnseal
+	}
+	if extrVaultAutounseal, ok := os.LookupEnv("VAULT_AUTOUNSEAL"); !ok {
+		log.Warn("VAULT_AUTOUNSEAL not set. Defaulting to ", DefaultVaultAutounseal)
+		vaultAutounseal = DefaultVaultAutounseal
+	} else {
+		vaultAutounseal, err = strconv.ParseBool(extrVaultAutounseal)
+		if err != nil {
+			log.Error("Invalid value for VAULT_AUTOUNSEAL" + err.Error())
+		}
 	}
 }

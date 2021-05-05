@@ -19,9 +19,17 @@ func checkInit(pod vaultPod) (bool, error) {
 
 func operatorInit(pod vaultPod) (*string, *[]string, error) {
 
-	initReq := &vault.InitRequest{
-		SecretShares:    vaultKeyShares,
-		SecretThreshold: vaultKeyThreshold,
+	initReq := &vault.InitRequest{}
+	if vaultAutounseal {
+		initReq = &vault.InitRequest{
+			RecoveryShares:    vaultKeyShares,
+			RecoveryThreshold: vaultKeyThreshold,
+		}
+	} else {
+		initReq = &vault.InitRequest{
+			SecretShares:    vaultKeyShares,
+			SecretThreshold: vaultKeyThreshold,
+		}
 	}
 	initResp, err := pod.client.Sys().Init(initReq)
 	if err != nil {
